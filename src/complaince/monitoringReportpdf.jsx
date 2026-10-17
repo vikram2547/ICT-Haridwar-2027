@@ -16,7 +16,7 @@ export const DownloadPDF = ({ assetDetails, details = [] }) => {
               style="position: absolute; right: 20px; top: 5px; height: 90px; width: 90px; margin-right: 20px; margin-top: 20px;" 
             />
         
-            <h3 style="text-align: center; margin-bottom: 30px;">Maha Kumbh 2025</h3>
+            <h3 style="text-align: center; margin-bottom: 30px;">Haridwar Kumbh 2027</h3>
             <h5 style="text-align: center; margin-bottom: 30px;">ICT Sanitation and Tentage Monitoring System</h5>
         
             <!-- Vendor Info Table -->

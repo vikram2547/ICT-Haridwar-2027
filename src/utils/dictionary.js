@@ -288,6 +288,25 @@ export const DICT = {
     en: "Setting",
     hi: "सेटिंग",
   },
+  reports: {
+    en: "Reports",
+    hi: "रिपोर्ट्स",
+  },
+
+  dashboard: {
+    en: "Dashboards",
+    hi: "डैशबोर्ड",
+  },
+
+  user_access_registration: {
+    en: "User Access & Registration",
+    hi: "उपयोगकर्ता पहुंच और पंजीकरण",
+  },
+
+  master_data_creation: {
+    en: "Master Data Creation",
+    hi: "मास्टर डेटा सृजन",
+  },
   name: {
     en: "Name",
     hi: "नाम",

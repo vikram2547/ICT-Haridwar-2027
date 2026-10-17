@@ -22,7 +22,7 @@ export const VendorDetailsPdfFunction = (
   doc.y = 15;
 
   // Centered ICT heading
-  const ictHeading = "Maha Kumbh 2025";
+  const ictHeading = "Haridwar Kumbh 2027";
   const pageWidth = doc.internal.pageSize.getWidth();
   const ictX = (pageWidth - doc.getTextWidth(ictHeading)) / 2; // Center the heading
   doc.setFontSize(20); // Increase font size for better prominence

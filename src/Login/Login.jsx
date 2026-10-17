@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Button, Form, Input, message, Modal } from "antd";
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
-import loginImage from "../assets/Images/loginImage.jpg";
+// import loginImage from "../assets/Images/loginImage.jpg";
+import loginImg from "../assets/Images/loginImg.webp";
 import { useNavigate } from "react-router";
 import { DICT } from "../utils/dictionary";
 import { loginFetch } from "../Fetch/Axios";
@@ -151,7 +152,7 @@ const Login = () => {
       <div className="h-screen m-auto flex w-10/12 flex-col justify-center">
         <div className="grid md:grid-cols-2 grid-cols-1 w-full h-96 shadow-xl ">
           <div className="w-full h-96 hidden md:flex">
-            <img src={loginImage} alt="login" className="w-full h-full" />
+            <img src={loginImg} alt="login" className="w-full h-full" />
           </div>
           <div className="flex h-full flex-col w-full items-center">
             <div className="text-center font-merriweather p-2 font-semibold text-lg flex flex-col items-center w-full m-auto justify-center">

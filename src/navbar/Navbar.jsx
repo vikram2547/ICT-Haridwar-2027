@@ -774,7 +774,7 @@ const Navbar = ({ lang, setLang }) => {
                 <DropDown
                   text="black"
                   items={dashboards(lang, dict)}
-                  name={"Dashboard"}
+                  name={dict.dashboard[lang]}
                 ></DropDown>
               </div>
             )}
@@ -783,8 +783,7 @@ const Navbar = ({ lang, setLang }) => {
                 <DropDown
                   text="black"
                   items={register_items(lang, dict)}
-                  // name={dict.register[lang]}
-                  name="User Access & Registration"
+                  name={dict.user_access_registration[lang]}
                 ></DropDown>
               </div>
             )}
@@ -793,8 +792,7 @@ const Navbar = ({ lang, setLang }) => {
                 <DropDown
                   text="black"
                   items={master_items(lang, dict)}
-                  // name={dict.register[lang]}
-                  name="Master Data Creation"
+                  name={dict.master_data_creation[lang]}
                 ></DropDown>
               </div>
             )}
@@ -826,7 +824,7 @@ const Navbar = ({ lang, setLang }) => {
                 <DropDown
                   text="black"
                   items={reports_items(lang, dict)}
-                  name="Reports"
+                  name={dict.reports[lang]}
                 ></DropDown>
               </div>
             )}
