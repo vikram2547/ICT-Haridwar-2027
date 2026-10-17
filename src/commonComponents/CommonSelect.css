@@ -1,0 +1,14 @@
+.ant-select-item:hover {
+    background: #e3f3ac !important;
+    color:green !important;
+    font-weight: 600;
+    border-radius: 0px !important;
+}
+
+.ant-select-item-option-content {
+    border-radius: 0px !important;
+}
+
+.ant-select-dropdown {
+    border-radius: 0px !important;
+}

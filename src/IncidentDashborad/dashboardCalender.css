@@ -1,0 +1,51 @@
+.rbc-event,
+.rbc-day-slot .rbc-background-event {
+  border: none !important;
+  padding: none !important;
+  background-color: none !important;
+  width: 100% !important;
+  text-align: none !important;
+}
+
+.rbc-btn-group button {
+  background: #7367f029;
+  color: #7367f0;
+}
+
+.rbc-btn-group .rbc-active {
+ background-color: #7367F03D;
+  color: #7367f0 !important;
+  box-shadow: none !important;
+
+}
+
+#all .ant-checkbox-inner {
+  background-color: green !important; /* Light blue background */
+}
+
+#omega .ant-checkbox-inner {
+  background-color: orange !important; /* Light blue background */
+}
+
+
+#sigma .ant-checkbox-inner {
+  background-color: teal !important; /* Light blue background */
+}
+
+#delta .ant-checkbox-inner {
+  background-color: blue !important; /* Light blue background */
+}
+
+#phoenix .ant-checkbox-inner {
+  background-color: violet !important; /* Light blue background */
+}
+
+#titan .ant-checkbox-inner {
+  background-color: pink !important; /* Light blue background */
+}
+
+.rbc-btn-group button{
+  border:none;
+  font-size: 14px;
+  padding: 7px;
+}

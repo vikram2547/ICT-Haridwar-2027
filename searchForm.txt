@@ -1,0 +1,37 @@
+
+  
+  const [searchQuery, setSearchQuery] = useState();
+
+  if (searchQuery) {
+    uri = uri + searchQuery;
+  }
+
+  useEffect(() => {
+    getDetails();
+    if (isUpdatedSelector) {
+      dispatch(setAssetTypeListIsUpdated({ isUpdated: false }));
+    }
+  }, [params, isUpdatedSelector, searchQuery]);
+
+
+<CommonSearchForm
+        setSearchQuery={setSearchQuery}
+        searchQuery={searchQuery}
+        fields={[{ name: "name", label: "Asset Type" }]}
+        dropFields={[
+          {
+            name: "asset_main_type_id",
+            label: "Main Type",
+            options: [
+              {
+                label: "Sanitation",
+                value: "1",
+              },
+              {
+                label: "Tentage",
+                value: "2",
+              },
+            ],
+          },
+        ]}
+      ></CommonSearchForm>

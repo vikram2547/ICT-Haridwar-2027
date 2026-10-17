@@ -1,0 +1,29 @@
+{
+  "files": {
+    "main.css": "/static/css/main.c4c50499.css",
+    "main.js": "/static/js/main.ac8d5b82.js",
+    "static/js/359.fe072144.chunk.js": "/static/js/359.fe072144.chunk.js",
+    "static/js/234.3399b264.chunk.js": "/static/js/234.3399b264.chunk.js",
+    "static/js/511.6d51739c.chunk.js": "/static/js/511.6d51739c.chunk.js",
+    "static/media/map_banner.png": "/static/media/map_banner.b66f6ff3f1a84206411d.png",
+    "static/media/clean_scared.png": "/static/media/clean_scared.0b056177906dea4bbcf7.png",
+    "static/media/footerBg.png": "/static/media/footerBg.ee30949fc1a164b311d3.png",
+    "static/media/UPGovLatestLogo.png": "/static/media/UPGovLatestLogo.6cdf7ae21736ff9af30c.png",
+    "static/media/kumbh_mela_img.png": "/static/media/kumbh_mela_img.a4544d4f66156ce984e0.png",
+    "static/media/Contact Image.png": "/static/media/Contact Image.511139699ad3336976f6.png",
+    "static/media/tentimage.jpg": "/static/media/tentimage.517e6b5e19dd8354ad31.jpg",
+    "static/media/kumbh image 2.png": "/static/media/kumbh image 2.6d52bf4c8c19e618d4aa.png",
+    "static/media/loginImage.jpg": "/static/media/loginImage.a5a39008b2a07a1bba9c.jpg",
+    "static/media/kumbh image 3.jpeg": "/static/media/kumbh image 3.0b16d76765835633af54.jpeg",
+    "index.html": "/index.html",
+    "main.c4c50499.css.map": "/static/css/main.c4c50499.css.map",
+    "main.ac8d5b82.js.map": "/static/js/main.ac8d5b82.js.map",
+    "359.fe072144.chunk.js.map": "/static/js/359.fe072144.chunk.js.map",
+    "234.3399b264.chunk.js.map": "/static/js/234.3399b264.chunk.js.map",
+    "511.6d51739c.chunk.js.map": "/static/js/511.6d51739c.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.c4c50499.css",
+    "static/js/main.ac8d5b82.js"
+  ]
+}
