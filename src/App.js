@@ -123,6 +123,7 @@ import VendorTypeReport from "./Reports/VendorwiseReports/VendorTypeReport";
 import ParkingTypeReport from "./Reports/Parking/ParkingTypeReport";
 import VehicleImeiReport from "./Reports/VehicleReport/VehicleNewReport";
 import WeeklyRegistrationReport from "./Reports/WeeklyRegReport";
+import AddSectorForm from "./register/sectorListing/add form/index";
 
 function App() {
   const navigate = useNavigate();
@@ -430,11 +431,10 @@ function App() {
             element={<GPSFleetRegistration></GPSFleetRegistration>}
           ></Route>
 
-          {/* 
-            <Route
-              path="vendor-proposed-sectors/:page?/:per_page?"
-              element={<VendorProposedSectors></VendorProposedSectors>}
-            ></Route> */}
+          <Route
+            path="add-sector-form"
+            element={<AddSectorForm></AddSectorForm>}
+          ></Route>
 
           <Route
             path="asset-type-registration"

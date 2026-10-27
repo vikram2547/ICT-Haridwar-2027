@@ -1,6 +1,7 @@
+
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useOutletContext } from "react-router";
 import { useDispatch } from "react-redux";
 import moment from "moment";
 import { Button, Form, Input, message, Modal, Table } from "antd";
@@ -18,6 +19,7 @@ import { deleteVendorDetails } from "./vendorDetailsSlice";
 import { getPdfExcelData } from "../../asset/AssetsSlice";
 import { VendorDetailsPdfFunction } from "./vendorDetailsPdf";
 import { VendorDetailsToExcel } from "./vendorDetailsExcel";
+import { DICT } from "../../../utils/dictionary";
 
 const VendorDetails = () => {
   const [loading, setLoading] = useState(false);
@@ -25,7 +27,7 @@ const VendorDetails = () => {
   const [proposedSectors, setProposedSectors] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [userName, setUserName] = useState("");
-  const [searchQuery, setSearchQuery] = useState();
+  const [searchQuery] = useState();
 
   const [details, setDetails] = useState({
     list: [],
@@ -39,6 +41,19 @@ const VendorDetails = () => {
   const navigate = useNavigate();
   const params = useParams();
 
+  // Language context
+  const outletContext = useOutletContext() || [];
+  const contextDict = outletContext[0] || {};
+  const lang = outletContext[1] || localStorage.getItem("lang") || "en";
+
+  const t = (key, fallback) =>
+    contextDict?.[key]?.[lang] ??
+    contextDict?.[key]?.en ??
+    DICT?.[key]?.[lang] ??
+    DICT?.[key]?.en ??
+    fallback ??
+    key;
+
   const handleProposedSectorsView = (data, record) => {
     setProposedSectors(record);
     setIsModalVisible(true);
@@ -50,7 +65,7 @@ const VendorDetails = () => {
     setProposedSectors([]);
   };
 
-  // handle delete
+  // Open delete confirmation
   const handleDelete = (data) => {
     form.setFieldsValue({
       asset_type_name: data?.asset_type_name,
@@ -59,43 +74,78 @@ const VendorDetails = () => {
     setViewDeleteModal(true);
   };
 
-  // handle delete API
+  // Delete vendor details
   const onFinish = async (value) => {
-    const url = URLS?.deleteVendorDetails?.path + value?.vendor_detail_id;
-    const res = await dispatch(deleteVendorDetails(url));
-    if (res) {
-      getDetails();
-      message.success(
-        "Vendor Details Deleted Successfully for " + value?.asset_type_name
+    try {
+      const url =
+        URLS?.deleteVendorDetails?.path + value?.vendor_detail_id;
+
+      const res = await dispatch(deleteVendorDetails(url));
+
+      if (res) {
+        await getDetails();
+        message.success(
+          `${t(
+            "vendor_details_delete_success",
+            "Vendor details deleted successfully for"
+          )} ${value?.asset_type_name}`
+        );
+        setViewDeleteModal(false);
+        form.resetFields();
+      } else {
+        message.error(
+          t(
+            "vendor_details_delete_error",
+            "Something went wrong! Please try again."
+          )
+        );
+      }
+    } catch (error) {
+      message.error(
+        t(
+          "vendor_details_delete_error",
+          "Something went wrong! Please try again."
+        )
       );
-    } else {
-      message.error("Something went wrong! Please try again.");
     }
-    setViewDeleteModal(false);
   };
 
   const getDetails = async () => {
     setLoading(true);
-    let uri = URLS.vendorDetails.path + params.id + "&";
 
-    if (params.page) uri += params.page;
-    if (params.per_page) uri += "&" + params.per_page;
+    try {
+      let uri = URLS.vendorDetails.path + params.id + "&";
 
-    const res = await getData(uri, {
-      "x-api-version": URLS.vendorDetails.version,
-    });
+      if (params.page) uri += params.page;
+      if (params.per_page) uri += "&" + params.per_page;
 
-    if (res) {
-      const data = res.data;
-      setUserName(data.userdetails[0]?.user_name);
-      setDetails({
-        list: data.userdetails,
-        pageLength: data.paging[0].length,
-        currentPage: data.paging[0].currentPage,
-        totalRecords: data.paging[0].totalrecords,
+      const res = await getData(uri, {
+        "x-api-version": URLS.vendorDetails.version,
       });
+
+      if (res?.data) {
+        const data = res.data;
+        const paging = data?.paging?.[0] || {};
+
+        setUserName(data?.userdetails?.[0]?.user_name || "");
+
+        setDetails({
+          list: data?.userdetails || [],
+          pageLength: paging?.length || 25,
+          currentPage: paging?.currentPage || 1,
+          totalRecords: paging?.totalrecords || 0,
+        });
+      }
+    } catch (error) {
+      message.error(
+        t(
+          "vendor_details_fetch_error",
+          "Unable to fetch vendor details."
+        )
+      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -104,45 +154,58 @@ const VendorDetails = () => {
     } else {
       navigate("/vendor");
     }
-  }, [params, dispatch, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id, params.page, params.per_page, navigate]);
 
   const columns = [
     {
-      title: "Sr. No",
+      title: t("vendor_details_sr_no", "Sr. No"),
       dataIndex: "sr",
       key: "sr",
       width: 80,
     },
     {
-      title: "Category",
+      title: t("vendor_details_category", "Category"),
       dataIndex: "asset_main_type_name",
       key: "main_type",
     },
     {
-      title: "Toilets & Tentage Type",
+      title: t(
+        "vendor_details_asset_type",
+        "Toilets & Tentage Type"
+      ),
       dataIndex: "asset_type_name",
       key: "asset_type",
       width: 300,
     },
     {
-      title: "Contract Number",
+      title: t("vendor_details_contract_number", "Contract Number"),
       dataIndex: "contract_number",
       key: "contract_number",
       width: 120,
     },
     {
-      title: "Work Order Number",
+      title: t(
+        "vendor_details_work_order_number",
+        "Work Order Number"
+      ),
       dataIndex: "work_order_number",
       key: "work_order_number",
       width: 120,
     },
     {
-      title: "Allotted Quantity",
+      title: t(
+        "vendor_details_allotted_quantity",
+        "Allotted Quantity"
+      ),
       dataIndex: "total_allotted_quantity",
       key: "total_allotted_quantity",
     },
     {
-      title: "Proposed Sectors & Parking",
+      title: t(
+        "vendor_details_proposed_sectors_parking",
+        "Proposed Sectors & Parking"
+      ),
       dataIndex: "proposedsectors",
       key: "proposed_sectors",
       render: (text, record) => (
@@ -150,94 +213,106 @@ const VendorDetails = () => {
           onClick={() => handleProposedSectorsView(text, record)}
           className="text-blue-500 cursor-pointer"
         >
-          View
+          {t("vendor_details_view", "View")}
         </div>
       ),
     },
     {
-      title: "Manager Contact 1",
+      title: t(
+        "vendor_details_manager_contact_1",
+        "Manager Contact 1"
+      ),
       dataIndex: "manager_contact_1",
       key: "manager_contact_1",
       width: 160,
     },
     {
-      title: "Manager Contact 2",
+      title: t(
+        "vendor_details_manager_contact_2",
+        "Manager Contact 2"
+      ),
       dataIndex: "manager_contact_2",
       key: "manager_contact_2",
       width: 160,
     },
     {
-      title: "Date of Allocation",
+      title: t(
+        "vendor_details_date_of_allocation",
+        "Date of Allocation"
+      ),
       dataIndex: "date_of_allocation",
       key: "date_of_allocation",
       width: 160,
-      render: (text) => {
-        return text ? moment(text).format("DD-MMM-YYYY") : "";
-      },
+      render: (text) =>
+        text ? moment(text).format("DD-MMM-YYYY") : "",
     },
     {
-      title: "Action",
+      title: t("vendor_details_action", "Action"),
       dataIndex: "action",
       key: "action",
       fixed: "right",
       width: 130,
       render: (text, record) => (
-        <>
-          <div className="flex justify-between">
-            <Button
-              className="bg-blue-100 border-blue-500 focus:ring-blue-500 hover:bg-blue-200 rounded-full"
-              onClick={() => {
-                navigate(`/vendor/add-vendor-details-form/${params?.id}`, {
+        <div className="flex justify-between">
+          <Button
+            className="bg-blue-100 border-blue-500 focus:ring-blue-500 hover:bg-blue-200 rounded-full"
+            title={t("vendor_details_edit", "Edit")}
+            aria-label={t("vendor_details_edit", "Edit")}
+            onClick={() => {
+              navigate(
+                `/vendor/add-vendor-details-form/${params?.id}`,
+                {
                   state: {
                     key: "UpdateKey",
-                    record: record, // Pass the record as part of the state
+                    record,
                   },
-                });
-              }}
-            >
-              <EditOutlined />
-            </Button>
-            <Button
-              className="bg-red-100 border-red-500 focus:ring-red-500 hover:bg-red-200 rounded-full"
-              onClick={() => {
-                handleDelete(record);
-              }}
-            >
-              <DeleteOutlined />
-            </Button>
-          </div>
-        </>
+                }
+              );
+            }}
+          >
+            <EditOutlined />
+          </Button>
+
+          <Button
+            className="bg-red-100 border-red-500 focus:ring-red-500 hover:bg-red-200 rounded-full"
+            title={t("vendor_details_delete", "Delete")}
+            aria-label={t("vendor_details_delete", "Delete")}
+            onClick={() => handleDelete(record)}
+          >
+            <DeleteOutlined />
+          </Button>
+        </div>
       ),
     },
   ];
 
   const totalAllottedQuantity = details?.list
     .reduce(
-      (total, item) => total + Number(item?.total_allotted_quantity || 0),
+      (total, item) =>
+        total + Number(item?.total_allotted_quantity || 0),
       0
     )
-    .toLocaleString(); // Convert to digit format with commas
+    .toLocaleString();
 
-  // pdf header
+  // PDF headers
   const pdfHeader = [
-    "Sr No",
-    "Category",
-    "Toilets & Tentage Type",
-    // "Contract Number",
-    // "Work Order Number",
-    "Total Allotted Quantity",
-    // "Date of Allocation",
-    // "Country",
+    t("vendor_details_sr_no", "Sr No"),
+    t("vendor_details_category", "Category"),
+    t("vendor_details_asset_type", "Toilets & Tentage Type"),
+    t("vendor_details_total_allotted_quantity", "Total Allotted Quantity"),
   ];
 
-  // pdf header
-  const subTableHeader = ["Sector Name / Parking Name", "Quantity"];
+  const subTableHeader = [
+    t("vendor_details_sector_parking_name", "Sector Name / Parking Name"),
+    t("vendor_details_quantity", "Quantity"),
+  ];
 
-  // excel && pdf file
+  // Export PDF or Excel
   const exportToFile = async (isExcel) => {
     try {
       const url =
-        URLS.vendorDetails.path + `${params?.id}&page=1&per_page=5000`;
+        URLS.vendorDetails.path +
+        `${params?.id}&page=1&per_page=5000`;
 
       const res = await dispatch(
         getPdfExcelData(`${url}${searchQuery ? searchQuery : ""}`)
@@ -247,98 +322,170 @@ const VendorDetails = () => {
         throw new Error("No data found in the response data.");
       }
 
-      const registerCount = res?.data?.userdetails?.reduce((total, element) => {
-        const sectorRegistered = element?.proposedsectors?.reduce(
-          (sectorTotal, item) => sectorTotal + Number(item?.registered),
-          0
-        );
+      const registerCount = res.data.userdetails.reduce(
+        (total, element) => {
+          const sectorRegistered =
+            element?.proposedsectors?.reduce(
+              (sectorTotal, item) =>
+                sectorTotal + Number(item?.registered || 0),
+              0
+            ) || 0;
 
-        const parkingRegistered = element?.proposedparkings?.reduce(
-          (sectorTotal, item) => sectorTotal + Number(item?.registered),
-          0
-        );
+          const parkingRegistered =
+            element?.proposedparkings?.reduce(
+              (parkingTotal, item) =>
+                parkingTotal + Number(item?.registered || 0),
+              0
+            ) || 0;
 
-        // Return the total of both
-        return total + sectorRegistered + parkingRegistered;
-      }, 0);
+          return total + sectorRegistered + parkingRegistered;
+        },
+        0
+      );
 
-      // Map data for Excel
       const myexcelData =
         isExcel &&
-        res?.data?.userdetails?.map((data, index) => {
-          return {
-            Sr: index + 1,
-            Category: data?.asset_main_type_name,
-            "Toilets & Tentage Type": data?.asset_type_name,
-            "Total Allotted Quantity": Number(data?.total_allotted_quantity),
-            "Sector / Parking": [
-              ...data?.proposedsectors?.map((item) => [
-                item?.sector_name,
-                Number(item?.quantity),
-                Number(item?.registered) || 0,
-              ]),
-              ...[""],
-              ...data?.proposedparkings?.map((item) => [
-                item?.parking_name,
-                Number(item?.quantity),
-                Number(item?.registered) || 0,
-              ]),
-            ],
-          };
-        });
+        res.data.userdetails.map((data, index) => ({
+          [t("vendor_details_sr_no", "Sr")]: index + 1,
+          [t("vendor_details_category", "Category")]:
+            data?.asset_main_type_name,
+          [t(
+            "vendor_details_asset_type",
+            "Toilets & Tentage Type"
+          )]: data?.asset_type_name,
+          [t(
+            "vendor_details_total_allotted_quantity",
+            "Total Allotted Quantity"
+          )]: Number(data?.total_allotted_quantity || 0),
+          [t("vendor_details_sector_parking", "Sector / Parking")]: [
+            ...(data?.proposedsectors || []).map((item) => [
+              item?.sector_name,
+              Number(item?.quantity || 0),
+              Number(item?.registered || 0),
+            ]),
+            [""],
+            ...(data?.proposedparkings || []).map((item) => [
+              item?.parking_name,
+              Number(item?.quantity || 0),
+              Number(item?.registered || 0),
+            ]),
+          ],
+        }));
 
-      // Call the export function
-      isExcel &&
+      if (isExcel) {
         VendorDetailsToExcel(
           myexcelData,
-          `${userName} Vendor Details`,
+          `${userName} ${t("vendor_details_export_title", "Vendor Details")}`,
           {},
           totalAllottedQuantity,
           registerCount
         );
+      }
 
       const pdfData =
         !isExcel &&
-        res?.data?.userdetails?.map((data, index) => [
+        res.data.userdetails.map((data, index) => [
           index + 1,
           data?.asset_main_type_name,
           data?.asset_type_name,
-          // Number(data?.contract_number),
-          // Number(data?.work_order_number),
-          Number(data?.total_allotted_quantity),
-          // moment(data?.date_of_allocation).format("DD-MMM-YYYY"),
+          Number(data?.total_allotted_quantity || 0),
           [
-            ...data?.proposedsectors?.map((item) => [
+            ...(data?.proposedsectors || []).map((item) => [
               item?.sector_name,
               item?.quantity,
             ]),
-            ...data?.proposedparkings?.map((item) => [
+            ...(data?.proposedparkings || []).map((item) => [
               item?.parking_name,
               item?.quantity,
             ]),
           ],
         ]);
 
-      // Call the export function
-      !isExcel &&
+      if (!isExcel) {
         VendorDetailsPdfFunction(
-          `${userName} Vendor Details`,
-          `${userName} Vendor Details`,
+          `${userName} ${t("vendor_details_export_title", "Vendor Details")}`,
+          `${userName} ${t("vendor_details_export_title", "Vendor Details")}`,
           pdfHeader,
           pdfData,
           subTableHeader,
           true
         );
+      }
     } catch (error) {
-      message.error(`Error occurred: ${error?.message || "Unknown error"}`);
+      message.error(
+        `${t("vendor_details_export_error", "Export error")}: ${
+          error?.message || t("vendor_details_unknown_error", "Unknown error")
+        }`
+      );
     }
   };
+
+  const sectorColumns = [
+    {
+      title: t("vendor_details_sector_name", "Sector Name"),
+      dataIndex: "sector_name",
+      key: "sector_name",
+      width: "50%",
+    },
+    {
+      title: t("vendor_details_quantity", "Quantity"),
+      dataIndex: "quantity",
+      key: "quantity",
+    },
+    {
+      title: t("vendor_details_registered", "Registered"),
+      dataIndex: "registered",
+      key: "registered",
+    },
+  ];
+
+  const parkingColumns = [
+    {
+      title: t("vendor_details_parking_name", "Parking Name"),
+      dataIndex: "parking_name",
+      key: "parking_name",
+      width: "50%",
+    },
+    {
+      title: t("vendor_details_quantity", "Quantity"),
+      dataIndex: "quantity",
+      key: "quantity",
+    },
+    {
+      title: t("vendor_details_registered", "Registered"),
+      dataIndex: "registered",
+      key: "registered",
+    },
+  ];
+
+  const totalRegistered =
+    (proposedSectors?.proposedparkings || []).reduce(
+      (total, park) => total + Number(park?.registered || 0),
+      0
+    ) +
+    (proposedSectors?.proposedsectors || []).reduce(
+      (total, sector) => total + Number(sector?.registered || 0),
+      0
+    );
+
+  const totalQuantity =
+    (proposedSectors?.proposedparkings || []).reduce(
+      (total, park) => total + Number(park?.quantity || 0),
+      0
+    ) +
+    (proposedSectors?.proposedsectors || []).reduce(
+      (total, sector) => total + Number(sector?.quantity || 0),
+      0
+    );
 
   return (
     <div>
       <div className="flex gap-2 items-center">
         <Link to="/vendor">
-          <Button className="bg-gray-200 rounded-full w-9 h-9">
+          <Button
+            className="bg-gray-200 rounded-full w-9 h-9"
+            aria-label={t("vendor_details_back", "Back")}
+          >
             <ArrowLeftOutlined />
           </Button>
         </Link>
@@ -347,7 +494,7 @@ const VendorDetails = () => {
           <CommonDivider
             label={
               <div>
-                Vendor Details For{" "}
+                {t("vendor_details_heading", "Vendor Details For")}{" "}
                 <span className="text-blue-500">{userName}</span>
               </div>
             }
@@ -355,38 +502,29 @@ const VendorDetails = () => {
               <Button
                 className="bg-orange-300 mb-1"
                 onClick={() =>
-                  navigate(`/vendor/add-vendor-details-form/${params?.id}`, {
-                    state: {
-                      key: "AddKey",
-                    },
-                  })
+                  navigate(
+                    `/vendor/add-vendor-details-form/${params?.id}`,
+                    {
+                      state: {
+                        key: "AddKey",
+                      },
+                    }
+                  )
                 }
               >
-                Add Details
+                {t("vendor_details_add_button", "Add Details")}
               </Button>
             }
           />
+
           <div className="flex justify-end gap-2 font-semibold mb-4">
-            <div>
-              <Button
-                type="primary"
-                onClick={() => {
-                  exportToFile(false);
-                }}
-              >
-                Download Pdf
-              </Button>
-            </div>
-            <div>
-              <Button
-                type="primary"
-                onClick={() => {
-                  exportToFile(true);
-                }}
-              >
-                Download Excel
-              </Button>
-            </div>
+            <Button type="primary" onClick={() => exportToFile(false)}>
+              {t("vendor_details_download_pdf", "Download PDF")}
+            </Button>
+
+            <Button type="primary" onClick={() => exportToFile(true)}>
+              {t("vendor_details_download_excel", "Download Excel")}
+            </Button>
           </div>
         </div>
       </div>
@@ -397,17 +535,19 @@ const VendorDetails = () => {
         details={details}
         loading={loading}
         tableSubheading={{
-          "Total Allotted Quantity": totalAllottedQuantity,
+          [t(
+            "vendor_details_total_allotted_quantity",
+            "Total Allotted Quantity"
+          )]: totalAllottedQuantity,
         }}
       />
 
-      {/* sectors */}
+      {/* Proposed sectors and parking modal */}
       <Modal
-        title={
-          <div>
-            <h5>Proposed Sectors & Parking</h5>
-          </div>
-        }
+        title={t(
+          "vendor_details_proposed_sectors_parking",
+          "Proposed Sectors & Parking"
+        )}
         open={isModalVisible}
         onCancel={handleCancel}
         footer={null}
@@ -415,139 +555,134 @@ const VendorDetails = () => {
       >
         <div className="mb-4">
           <p>
-            <strong>Vendor Name:</strong> {proposedSectors?.user_name}
+            <strong>
+              {t("vendor_details_vendor_name", "Vendor Name")}:
+            </strong>{" "}
+            {proposedSectors?.user_name || "-"}
           </p>
+
           <p>
-            <strong>Category:</strong> {proposedSectors?.asset_main_type_name}
+            <strong>
+              {t("vendor_details_category", "Category")}:
+            </strong>{" "}
+            {proposedSectors?.asset_main_type_name || "-"}
           </p>
+
           <p>
-            <strong>Toilets & Tentage Type:</strong>{" "}
-            {proposedSectors?.asset_type_name}
+            <strong>
+              {t(
+                "vendor_details_asset_type",
+                "Toilets & Tentage Type"
+              )}
+              :
+            </strong>{" "}
+            {proposedSectors?.asset_type_name || "-"}
           </p>
         </div>
+
         {proposedSectors?.proposedsectors?.length ? (
-          <>
-            <Table
-              bordered
-              dataSource={proposedSectors?.proposedsectors}
-              rowKey="sector_name"
-              className="mb-4"
-              pagination={false}
-              scroll={{ x: 300, y: 400 }}
-              columns={[
-                {
-                  title: "Sector Name",
-                  dataIndex: "sector_name",
-                  key: "sector_name",
-                  width: "50%",
-                },
-                {
-                  title: "Quantity",
-                  dataIndex: "quantity",
-                  key: "quantity",
-                },
-                {
-                  title: "Registered",
-                  dataIndex: "registered",
-                  key: "registered",
-                },
-              ]}
-            />
-          </>
+          <Table
+            bordered
+            dataSource={proposedSectors.proposedsectors}
+            rowKey="sector_name"
+            className="mb-4"
+            pagination={false}
+            scroll={{ x: 300, y: 400 }}
+            columns={sectorColumns}
+          />
         ) : (
-          <p>No sectors found for this asset type.</p>
+          <p>
+            {t(
+              "vendor_details_no_sectors",
+              "No sectors found for this asset type."
+            )}
+          </p>
         )}
+
         {proposedSectors?.proposedparkings?.length ? (
-          <>
-            <Table
-              bordered
-              className="mb-4"
-              dataSource={proposedSectors?.proposedparkings}
-              rowKey="sector_name"
-              pagination={false}
-              scroll={{ x: 300, y: 400 }}
-              columns={[
-                {
-                  title: "Parking Name",
-                  dataIndex: "parking_name",
-                  key: "parking_name",
-                  width: "50%",
-                },
-                {
-                  title: "Quantity",
-                  dataIndex: "quantity",
-                  key: "quantity",
-                },
-                {
-                  title: "Registered",
-                  dataIndex: "registered",
-                  key: "registered",
-                },
-              ]}
-            />
-          </>
+          <Table
+            bordered
+            className="mb-4"
+            dataSource={proposedSectors.proposedparkings}
+            rowKey="parking_name"
+            pagination={false}
+            scroll={{ x: 300, y: 400 }}
+            columns={parkingColumns}
+          />
         ) : (
-          <p>No Parking found for this asset type.</p>
+          <p>
+            {t(
+              "vendor_details_no_parking",
+              "No parking found for this asset type."
+            )}
+          </p>
         )}
+
         {(proposedSectors?.proposedsectors?.length ||
-          proposedSectors?.proposedparkings?.length) && (
-          <>
-            {/* <div className="flex justify-around"> */}
-            <div className="flex gap-16 flex-row-reverse">
-              {/* <div></div> */}
-              <div className="text-right font-semibold mt-2">
-                Total Registered:{" "}
-                {(
-                  proposedSectors?.proposedparkings?.reduce(
-                    (total, park) => total + Number(park?.registered || 0),
-                    0
-                  ) +
-                  proposedSectors?.proposedsectors?.reduce(
-                    (total, sector) => total + Number(sector?.registered || 0),
-                    0
-                  )
-                ).toLocaleString()}
-              </div>
-              <div className="text-right font-semibold mt-2">
-                Total Quantity:{" "}
-                {(
-                  proposedSectors?.proposedparkings?.reduce(
-                    (total, park) => total + Number(park?.quantity || 0),
-                    0
-                  ) +
-                  proposedSectors?.proposedsectors?.reduce(
-                    (total, sector) => total + Number(sector?.quantity || 0),
-                    0
-                  )
-                ).toLocaleString()}
-              </div>
+          proposedSectors?.proposedparkings?.length) ? (
+          <div className="flex gap-16 flex-row-reverse">
+            <div className="text-right font-semibold mt-2">
+              {t("vendor_details_total_registered", "Total Registered")}:{" "}
+              {totalRegistered.toLocaleString()}
             </div>
-          </>
-        )}
+
+            <div className="text-right font-semibold mt-2">
+              {t("vendor_details_total_quantity", "Total Quantity")}:{" "}
+              {totalQuantity.toLocaleString()}
+            </div>
+          </div>
+        ) : null}
       </Modal>
 
+      {/* Delete confirmation modal */}
       <Modal
-        title="Delete Vendor Details"
+        title={t(
+          "vendor_details_delete_title",
+          "Delete Vendor Details"
+        )}
         open={viewDeleteModal}
         onCancel={handleCancel}
         footer={null}
         width={400}
       >
         <Form form={form} layout="vertical" onFinish={onFinish}>
-          <p>Are you sure you want to delete this Vendor Details?</p>
+          <p>
+            {t(
+              "vendor_details_delete_confirmation",
+              "Are you sure you want to delete these vendor details?"
+            )}
+          </p>
 
-          {/* Optional: Confirmation Checkbox or other fields */}
           <Form.Item name="asset_type_name">
-            <Input disabled className="w-full" placeholder="Enter quantity" />
+            <Input
+              disabled
+              className="w-full"
+              placeholder={t(
+                "vendor_details_asset_type_placeholder",
+                "Asset type"
+              )}
+            />
           </Form.Item>
+
           <Form.Item name="vendor_detail_id">
-            <Input disabled className="w-full" placeholder="Enter quantity" />
+            <Input
+              disabled
+              className="w-full"
+              placeholder={t(
+                "vendor_details_id_placeholder",
+                "Vendor detail ID"
+              )}
+            />
           </Form.Item>
 
           <Form.Item>
             <div className="flex justify-end space-x-2">
+              <Button type="default" onClick={handleCancel}>
+                {t("vendor_details_cancel", "Cancel")}
+              </Button>
+
               <Button type="primary" danger htmlType="submit">
-                Delete
+                {t("vendor_details_delete", "Delete")}
               </Button>
             </div>
           </Form.Item>

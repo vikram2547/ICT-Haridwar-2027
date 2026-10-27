@@ -1,7 +1,21 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router";
+
+import React, { useEffect, useState } from "react";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useOutletContext,
+} from "react-router";
 import { useDispatch } from "react-redux";
-import { Collapse, Form, Button, notification, Row, Col, message } from "antd";
+import {
+  Collapse,
+  Form,
+  Button,
+  notification,
+  Row,
+  Col,
+  message,
+} from "antd";
 import dayjs from "dayjs";
 import moment from "moment/moment";
 
@@ -9,8 +23,6 @@ import { getMonitoringAgent } from "./monitoringSlice";
 import search from "../assets/Dashboard/icon-search.png";
 import { generateSearchQuery } from "../urils/getSearchQuery";
 import {
-  cleanStatus,
-  CompliantStatus,
   dateOptions,
   getFormatedNumber,
   getValueLabel,
@@ -36,143 +48,247 @@ import AssetTypeSelectors from "../register/AssetType/assetTypeSelectors";
 import CustomTable from "../commonComponents/CustomTable";
 
 const Monitoring = () => {
+  const [dict, lang] = useOutletContext();
+
+  const t = (key, fallback) =>
+    dict?.[key]?.[lang] ?? dict?.[key]?.en ?? fallback ?? key;
+
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState(null);
   const [searchQuery, setSearchQuery] = useState();
   const [showDateRange, setShowDateRange] = useState(false);
-  const [filesName, setFilesName] = useState(null); // files Name
+  const [filesName, setFilesName] = useState(null);
+
   const [details, setDetails] = useState({
     list: [],
     pageLength: 25,
     currentPage: 1,
     totalUnit: 0,
   });
+
   const [pdfTitleData, setPdfTitleData] = useState({
     category: "Combined",
     type: "Combined",
     date: "Combined",
-  }); // pdf title data
+  });
+
   const checkQuestions = "Is the toilet clean?";
 
-  const { monitoringAgentDrop } = MonitoringSelector(); // monitoring agent drop
-  const { VendorCatTypeDrop } = VendorSelectors(); // vendor dropdown & Reports
-  const { AssetMainTypeDrop, AssetTypeDrop } = AssetTypeSelectors(); // asset main type & asset type
+  const { monitoringAgentDrop } = MonitoringSelector();
+  const { VendorCatTypeDrop } = VendorSelectors();
+  const { AssetMainTypeDrop, AssetTypeDrop } = AssetTypeSelectors();
 
   const dispatch = useDispatch();
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [form] = Form.useForm();
   const formValue = form.getFieldsValue();
-  const [api, contextHolder] = notification.useNotification({ top: 100 });
-  const openNotificationWithIcon = (type) => {
-    api[type]({
-      message: "Note",
-      duration: 7,
-      description: "Please enter some information to perform the search.",
-    });
-  };
 
-  const location = useLocation();
+  const [api, contextHolder] = notification.useNotification({
+    top: 100,
+  });
+
   const key = location.state?.key;
   const record = location.state?.record;
 
-  // const ImageUrl = localStorage.getItem("ImageUrl") || "";
   const userRoleId = localStorage.getItem("role_id");
   const UserId = localStorage.getItem("userId");
+
   const sessionDataString = localStorage.getItem("sessionData");
-  const sessionData = sessionDataString ? JSON.parse(sessionDataString) : null;
+  const sessionData = sessionDataString
+    ? JSON.parse(sessionDataString)
+    : null;
+
   const userCategoryId =
     sessionData?.allocatedmaintype?.[0]?.asset_main_type_id;
+
   const IsVendor = Number(userRoleId) === 8;
 
   const categoryType = form.getFieldValue("asset_main_type_id");
   const asset_type_id_name = form.getFieldValue("asset_type_id");
   const vendor_id_name = form.getFieldValue("vendor_id");
-  const GSD_name = form.getFieldValue("created_by");
-  const catTypeName = getValueLabel(categoryType, AssetMainTypeDrop, null);
-  const assetTypeName = getValueLabel(asset_type_id_name, AssetTypeDrop, null);
-  const vendorName = getValueLabel(vendor_id_name, VendorCatTypeDrop, null);
+
+  const catTypeName = getValueLabel(
+    categoryType,
+    AssetMainTypeDrop,
+    null
+  );
+
+  const assetTypeName = getValueLabel(
+    asset_type_id_name,
+    AssetTypeDrop,
+    null
+  );
+
+  const vendorName = getValueLabel(
+    vendor_id_name,
+    VendorCatTypeDrop,
+    null
+  );
+
   const ParkingTypeName = getValueLabel(
     formValue?.parking_type,
     parkingType,
     null
   );
 
-  // handle category
+  // Translate known static dropdown labels while preserving values.
+  const translateOptions = (options = [], labelMap = {}) =>
+    options.map((option) => {
+      const originalLabel =
+        typeof option.label === "string"
+          ? option.label
+          : option.label;
+
+      if (typeof originalLabel !== "string") {
+        return option;
+      }
+
+      return {
+        ...option,
+        label: labelMap[originalLabel]
+          ? t(labelMap[originalLabel].key, labelMap[originalLabel].fallback)
+          : originalLabel,
+      };
+    });
+
+  const translatedDateOptions = translateOptions(dateOptions, {
+    Today: { key: "monitoring_today", fallback: "Today" },
+    "Current Month": {
+      key: "monitoring_current_month",
+      fallback: "Current Month",
+    },
+    "Date Range": {
+      key: "monitoring_date_range",
+      fallback: "Date Range",
+    },
+  });
+
+  const translatedParkingTypes = translateOptions(parkingType, {
+    "Parking Type": {
+      key: "monitoring_parking_type",
+      fallback: "Parking Type",
+    },
+    "Parking Area": {
+      key: "monitoring_parking_area",
+      fallback: "Parking Area",
+    },
+    "Public Toilet": {
+      key: "monitoring_public_toilet",
+      fallback: "Public Toilet",
+    },
+  });
+
+  const openNotificationWithIcon = (type) => {
+    api[type]({
+      message: t("monitoring_note", "Note"),
+      duration: 7,
+      description: t(
+        "monitoring_search_required",
+        "Please enter some information to perform the search."
+      ),
+    });
+  };
+
+  // Handle category selection
   const handleSelect = (value) => {
     form.setFieldsValue({
       asset_type_id: null,
       vendor_id: null,
     });
+
     const url = URLS?.assetType?.path + value;
-    dispatch(getAssetTypes(url)); // get assset type
+    dispatch(getAssetTypes(url));
+
     if (!IsVendor && value) {
-      const paramData = {
-        asset_main_type_id: value,
-      };
-      dispatch(getVendorCategoryTypeDrop(paramData)); // vendor list
+      dispatch(
+        getVendorCategoryTypeDrop({
+          asset_main_type_id: value,
+        })
+      );
     }
   };
 
+  // Handle asset type selection
   const handleTypeSelect = (value) => {
     form.setFieldsValue({
       vendor_id: null,
     });
+
     if (!IsVendor && value) {
-      const paramData = {
-        asset_main_type_id: formValue?.asset_main_type_id,
-        asset_type_id: value,
-      };
-      dispatch(getVendorCategoryTypeDrop(paramData)); // vendor list
+      dispatch(
+        getVendorCategoryTypeDrop({
+          asset_main_type_id: formValue?.asset_main_type_id,
+          asset_type_id: value,
+        })
+      );
     }
   };
 
-  // fiter finish
+  // Search form submission
   const onFinishForm = (values) => {
     let pdfDateOpt = null;
+
     if (values?.date_format === "Today") {
       pdfDateOpt = moment().format("DD-MMM-YYYY");
     } else if (values?.date_format === "Current Month") {
-      const startDate = moment().startOf("month").format("DD-MMM-YYYY");
-      const endDate = moment().endOf("month").format("DD-MMM-YYYY");
-      pdfDateOpt = `${startDate} to ${endDate}`;
-    } else if (values?.date_format === "Date Range") {
-      const startDate = dayjs(values?.form_date).format("DD-MMM-YYYY");
-      const endDate = dayjs(values?.to_date).format("DD-MMM-YYYY");
-      pdfDateOpt = `${startDate} to ${endDate}`;
-    }
-    setPdfTitleData((pre) => ({
-      ...pre,
-      category: values?.asset_main_type_id ? catTypeName : "Combined",
-      type: values?.asset_type_id ? assetTypeName : "Combined",
-      date: pdfDateOpt || "Combined",
-    }));
-    const finalData = {
-      ...values,
-    };
-    if (values?.form_date || values?.to_date) {
-      const dayjsObjectFrom = dayjs(values?.form_date?.$d);
-      const dayjsObjectTo = dayjs(values?.to_date?.$d);
+      const start = moment()
+        .startOf("month")
+        .format("DD-MMM-YYYY");
 
-      // Format the date as 'YYYY-MM-DD'
-      const start = dayjsObjectFrom.format("YYYY-MM-DD");
-      const end = dayjsObjectTo.format("YYYY-MM-DD");
+      const end = moment()
+        .endOf("month")
+        .format("DD-MMM-YYYY");
+
+      pdfDateOpt = `${start} to ${end}`;
+    } else if (values?.date_format === "Date Range") {
+      const start = dayjs(values?.form_date).format("DD-MMM-YYYY");
+      const end = dayjs(values?.to_date).format("DD-MMM-YYYY");
+
+      pdfDateOpt = `${start} to ${end}`;
+    }
+
+    setPdfTitleData({
+      category: values?.asset_main_type_id
+        ? catTypeName
+        : "Combined",
+      type: values?.asset_type_id
+        ? assetTypeName
+        : "Combined",
+      date: pdfDateOpt || "Combined",
+    });
+
+    const finalData = { ...values };
+
+    if (values?.form_date || values?.to_date) {
+      const from = dayjs(values?.form_date);
+      const to = dayjs(values?.to_date);
+
+      const start = from.format("YYYY-MM-DD");
+      const end = to.format("YYYY-MM-DD");
+
       finalData.form_date = values?.form_date ? start : end;
       finalData.to_date = values?.to_date ? end : start;
     }
+
     const searchParams = generateSearchQuery(finalData);
+
     if (searchParams === "&") {
       openNotificationWithIcon("info");
     }
+
     setSearchQuery(searchParams);
   };
 
-  // reset form
+  // Reset form
   const resetForm = () => {
     form.resetFields();
     setSearchQuery("&");
     setShowDateRange(false);
     setFilesName(null);
+    setStartDate(null);
   };
 
   const handleDateSelect = (value) => {
@@ -183,511 +299,556 @@ const Monitoring = () => {
         form_date: null,
         to_date: null,
       });
+
       setShowDateRange(false);
+      setStartDate(null);
     }
   };
 
   const disabledDate = (current) => {
+    if (!current || !startDate) return false;
+
     const maxDate = moment(startDate).clone().add(9, "days");
+
     return (
-      current &&
-      (current.isBefore(startDate, "day") || current.isAfter(maxDate, "day"))
+      current.isBefore(startDate, "day") ||
+      current.isAfter(maxDate, "day")
     );
   };
 
+  // Fetch monitoring records
   const getDetails = async () => {
     setLoading(true);
-    let uri = URLS.monitoring.path + "?";
-    if (IsVendor) {
-      uri = uri + `&vendor_id=${UserId}`;
-    }
-    if (params.page) {
-      uri = uri + params.page;
-    }
-    if (params.per_page) {
-      uri = uri + "&" + params.per_page;
-    }
-    if (searchQuery) {
-      uri = uri + searchQuery;
-    }
 
-    const extraHeaders = { "x-api-version": URLS.asset.version };
-    const res = await getData(uri, extraHeaders);
+    try {
+      let uri = URLS.monitoring.path + "?";
 
-    if (res) {
-      const data = res.data;
-      const totalUnit = data?.listings?.reduce((total, start) => {
-        return total + Number(start?.unit_no);
-      }, 0);
-      setDetails(() => {
-        return {
-          list: data.listings,
-          pageLength: data.paging[0].length,
-          currentPage: data.paging[0].currentpage,
+      if (IsVendor) {
+        uri += `&vendor_id=${UserId}`;
+      }
+
+      if (params.page) {
+        uri += params.page;
+      }
+
+      if (params.per_page) {
+        uri += "&" + params.per_page;
+      }
+
+      if (searchQuery) {
+        uri += searchQuery;
+      }
+
+      const extraHeaders = {
+        "x-api-version": URLS.asset.version,
+      };
+
+      const res = await getData(uri, extraHeaders);
+
+      if (res) {
+        const data = res.data;
+
+        const totalUnit = data?.listings?.reduce(
+          (total, item) => total + Number(item?.unit_no || 0),
+          0
+        );
+
+        setDetails({
+          list: data?.listings || [],
+          pageLength: data?.paging?.[0]?.length || 25,
+          currentPage: data?.paging?.[0]?.currentpage || 1,
           totalUnit,
-          totalRecords: data.paging[0].totalrecords,
-        };
-      });
+          totalRecords: data?.paging?.[0]?.totalrecords || 0,
+        });
+      }
+    } catch (error) {
+      message.error(
+        t(
+          "monitoring_fetch_error",
+          "Unable to fetch monitoring records."
+        )
+      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  // file name
+  // Report filename
   const getReportName = () => {
     let reportName = "";
+
     if (vendorName) {
-      reportName += `${vendorName}`;
+      reportName += vendorName;
     }
+
     if (catTypeName) {
-      if (reportName) {
-        reportName += `-${catTypeName}`;
-      } else {
-        reportName += catTypeName;
-      }
+      reportName += reportName ? `-${catTypeName}` : catTypeName;
     }
+
     if (assetTypeName) {
       reportName += `(${assetTypeName})`;
     }
+
     if (ParkingTypeName) {
       reportName += ` ${ParkingTypeName} `;
     }
+
     return reportName
-      ? `${reportName} - Monitoring Report`
-      : "Toilet & Tentage Monitoring Report";
+      ? `${reportName} - ${t(
+          "monitoring_report",
+          "Monitoring Report"
+        )}`
+      : t(
+          "toilet_tentage_monitoring_report",
+          "Toilet & Tentage Monitoring Report"
+        );
   };
 
   useEffect(() => {
-    setFilesName(getReportName()); // file name
+    setFilesName(getReportName());
   }, [
     categoryType,
     asset_type_id_name,
     vendor_id_name,
-    GSD_name,
     ParkingTypeName,
+    lang,
   ]);
 
   useEffect(() => {
-    searchQuery && getDetails();
+    if (searchQuery) {
+      getDetails();
+    }
   }, [searchQuery]);
 
-  const getUsers = async (dataObj = {}) => {
-    const dayjsDate = new Date(formValue?.form_date);
-    const dayjsDateto_date = new Date(formValue?.to_date);
-    const formattedDate = moment(dayjsDate).format("YYYY-MM-DD");
-    const formattedto_date = moment(dayjsDateto_date).format("YYYY-MM-DD");
+  // Pagination search
+  const getUsers = (dataObj = {}) => {
+    const formValues = form.getFieldsValue();
+
+    const formattedDate = formValues?.form_date
+      ? dayjs(formValues.form_date).format("YYYY-MM-DD")
+      : moment().format("YYYY-MM-DD");
+
+    const formattedToDate = formValues?.to_date
+      ? dayjs(formValues.to_date).format("YYYY-MM-DD")
+      : moment().format("YYYY-MM-DD");
+
     const newParam = {
       page: dataObj?.page || "1",
       per_page: dataObj?.size || "25",
-      ...form.getFieldsValue(),
-      form_date: formValue?.form_date
-        ? formattedDate
-        : moment().format("YYYY-MM-DD"),
-      to_date: formValue?.to_date
-        ? formattedto_date
-        : moment().format("YYYY-MM-DD"),
+      ...formValues,
+      form_date: formattedDate,
+      to_date: formattedToDate,
     };
-    const searchParams = generateSearchQuery(newParam);
-    setSearchQuery(searchParams);
+
+    setSearchQuery(generateSearchQuery(newParam));
   };
 
+  // Load a saved search record
   useEffect(() => {
-    if (record) {
-      const dayjsObjectFrom = dayjs(record?.form_date?.$d) || null;
-      const dayjsObjectTo = dayjs(record?.to_date?.$d) || null; // Format the date as 'YYYY-MM-DD'
-      const start = dayjsObjectFrom.format("YYYY-MM-DD") || null;
-      const end = dayjsObjectTo.format("YYYY-MM-DD") || null;
-      const isDateType = record?.["date_format"] === "Date Range";
+    if (!record) return;
 
-      const modifyData = {
-        ...record,
-        ...(isDateType && { form_date: start || null }),
-        ...(isDateType && { to_date: end || null }),
-      };
-      const modifyFormData = {
-        ...record,
-        ...(isDateType && { form_date: dayjsObjectFrom || null }),
-        ...(isDateType && { to_date: dayjsObjectTo || null }),
-      };
-      if (isDateType) {
-        setShowDateRange(true);
-      }
+    const isDateType = record?.date_format === "Date Range";
 
-      form.setFieldsValue(modifyFormData);
-      const searchParams = generateSearchQuery(modifyData);
-      setSearchQuery(searchParams);
-      const url = URLS?.assetType?.path + record?.asset_main_type_id;
-      record?.asset_main_type_id && dispatch(getAssetTypes(url)); // get assset type
+    const fromDate = record?.form_date
+      ? dayjs(record.form_date)
+      : null;
 
-      const paramData = {
-        ...(record?.asset_main_type_id && {
-          asset_main_type_id: record?.asset_main_type_id,
-        }),
-        ...(record?.asset_type_id && { asset_type_id: record?.asset_type_id }),
-      };
-      if (record?.asset_main_type_id || record?.asset_type_id) {
-        dispatch(getVendorCategoryTypeDrop(paramData)); // vendor list
-      } else {
-        dispatch(getVendorCategoryTypeDrop({})); // vendor list
-      }
+    const toDate = record?.to_date
+      ? dayjs(record.to_date)
+      : null;
 
-      if (record?.created_by) {
-        const urls =
-          URLS?.monitoringAgent?.path + "&user_id=" + record?.created_by;
-        dispatch(getMonitoringAgent(urls)); // monitoring agent list
-      } else {
-        const urls = URLS?.monitoringAgent?.path;
-        dispatch(getMonitoringAgent(urls)); // monitoring agent list
+    const modifyData = {
+      ...record,
+      ...(isDateType && {
+        form_date: fromDate?.isValid()
+          ? fromDate.format("YYYY-MM-DD")
+          : null,
+        to_date: toDate?.isValid()
+          ? toDate.format("YYYY-MM-DD")
+          : null,
+      }),
+    };
+
+    const modifyFormData = {
+      ...record,
+      ...(isDateType && {
+        form_date: fromDate?.isValid() ? fromDate : null,
+        to_date: toDate?.isValid() ? toDate : null,
+      }),
+    };
+
+    if (isDateType) {
+      setShowDateRange(true);
+
+      if (fromDate?.isValid()) {
+        setStartDate(fromDate.format("YYYY-MM-DD"));
       }
     }
+
+    form.setFieldsValue(modifyFormData);
+    setSearchQuery(generateSearchQuery(modifyData));
+
+    if (record?.asset_main_type_id) {
+      dispatch(
+        getAssetTypes(
+          URLS?.assetType?.path + record.asset_main_type_id
+        )
+      );
+    }
+
+    const paramData = {
+      ...(record?.asset_main_type_id && {
+        asset_main_type_id: record.asset_main_type_id,
+      }),
+      ...(record?.asset_type_id && {
+        asset_type_id: record.asset_type_id,
+      }),
+    };
+
+    dispatch(getVendorCategoryTypeDrop(paramData));
+
+    const agentUrl = record?.created_by
+      ? `${URLS?.monitoringAgent?.path}&user_id=${record.created_by}`
+      : URLS?.monitoringAgent?.path;
+
+    dispatch(getMonitoringAgent(agentUrl));
   }, [record]);
 
+  // Initial data loading
   useEffect(() => {
-    const assetMainTypeUrl = URLS?.assetMainTypePerPage?.path;
-    dispatch(getAssetMainTypes(assetMainTypeUrl)); // asset main type
+    dispatch(
+      getAssetMainTypes(URLS?.assetMainTypePerPage?.path)
+    );
+
     if (!key) {
       getDetails();
+
       if (!IsVendor) {
-        const urls = URLS?.monitoringAgent?.path;
-        dispatch(getMonitoringAgent(urls)); // monitoring agent list
-        dispatch(getVendorCategoryTypeDrop()); // vendor list
+        dispatch(getMonitoringAgent(URLS?.monitoringAgent?.path));
+        dispatch(getVendorCategoryTypeDrop());
       } else {
-        const url = URLS?.assetType?.path + userCategoryId;
-        dispatch(getAssetTypes(url)); // get assset type
+        dispatch(
+          getAssetTypes(
+            URLS?.assetType?.path + userCategoryId
+          )
+        );
       }
     }
   }, []);
 
+  // Table columns
   const columns = [
     {
-      title: "Name",
+      title: t("monitoring_name", "Name"),
       dataIndex: "asset_type_name",
       key: "asset_type_name",
       width: 210,
-      sorter: (a, b) => a?.asset_type_name?.localeCompare(b?.asset_type_name),
+      sorter: (a, b) =>
+        a?.asset_type_name?.localeCompare(b?.asset_type_name),
     },
     {
-      title: "PTC / TAF Code ",
+      title: t("monitoring_ptc_taf_code", "PTC / TAF Code"),
       dataIndex: "asset_code",
       key: "asset_code",
       width: 110,
-      render: (text, record) => {
-        return text ? `${text}-${record?.unit_no}` : "";
-      },
+      render: (text, record) =>
+        text ? `${text}-${record?.unit_no}` : "",
       sorter: (a, b) => a?.asset_code - b?.asset_code,
     },
     {
-      title: "Sector Name",
+      title: t("monitoring_sector_name", "Sector Name"),
       dataIndex: "sector_name",
       key: "sector_name",
       width: 110,
-      // render: (text, record) => {
-      //   return text ? text : parkingType?.[1]?.label;
-      // },
       sorter: (a, b) => {
         const extractNumber = (str) => {
-          const match = str?.match(/\d+/); // Matches digits in the string
-          return match ? parseInt(match[0], 10) : 0; // Return the numeric part or 0 if not found
+          const match = str?.match(/\d+/);
+          return match ? parseInt(match[0], 10) : 0;
         };
-        const numA = extractNumber(a?.sector_name); // Use sector_name here
-        const numB = extractNumber(b?.sector_name); // Use sector_name here
-        return numA - numB; // Numeric sorting
+
+        return (
+          extractNumber(a?.sector_name) -
+          extractNumber(b?.sector_name)
+        );
       },
     },
     ...(!IsVendor
       ? [
           {
-            title: "Vendor Name",
+            title: t("monitoring_vendor_name", "Vendor Name"),
             dataIndex: "vendor_name",
             key: "vendor_name",
-            sorter: (a, b) => a?.vendor_name?.localeCompare(b?.vendor_name),
             width: 210,
+            sorter: (a, b) =>
+              a?.vendor_name?.localeCompare(b?.vendor_name),
           },
         ]
       : []),
     {
-      title: "Clean",
+      title: t("monitoring_clean", "Clean"),
       dataIndex: "zero_count",
-      key: "zero_count",
-      render: (text, record) => {
-        if (record?.issue?.some((que) => que?.question_en === checkQuestions)) {
-          return "Unclean";
-        } else {
-          return "Clean";
-        }
-      },
+      key: "clean_status",
       width: 110,
+      render: (text, record) =>
+        record?.issue?.some(
+          (question) => question?.question_en === checkQuestions
+        )
+          ? t("monitoring_unclean", "Unclean")
+          : t("monitoring_clean", "Clean"),
     },
     {
-      title: "Compliant",
+      title: t("monitoring_compliant", "Compliant"),
       dataIndex: "zero_count",
-      key: "zero_count",
-      render: (text) => {
-        return text
+      key: "compliant_status",
+      width: 130,
+      render: (text) =>
+        text !== null && text !== undefined && text !== ""
           ? Number(text) === 0
-            ? "Compliant"
+            ? t("monitoring_compliant", "Compliant")
             : Number(text) > 7
-            ? "Not Compliant"
-            : "Partial Compliant"
-          : "";
-      },
-      sorter: (a, b) => {
-        return (Number(a?.zero_count) || 0) - (Number(b?.zero_count) || 0);
-      },
-      width: 110,
+            ? t("monitoring_not_compliant", "Not Compliant")
+            : t("monitoring_partial_compliant", "Partial Compliant")
+          : "",
+      sorter: (a, b) =>
+        (Number(a?.zero_count) || 0) -
+        (Number(b?.zero_count) || 0),
     },
     {
-      title: "Date",
+      title: t("monitoring_date", "Date"),
       dataIndex: "created_at",
       key: "created_at",
-      render: (text) => {
-        return text ? moment(text).format("DD-MMM-YYYY") : "";
-      },
-      sorter: (a, b) => {
-        const dateA = moment(a?.created_at).toDate();
-        const dateB = moment(b?.created_at).toDate();
-        return dateA - dateB; // Sort by timestamp (ascending order)
-      },
       width: 120,
+      render: (text) =>
+        text ? moment(text).format("DD-MMM-YYYY") : "",
+      sorter: (a, b) =>
+        moment(a?.created_at).toDate() -
+        moment(b?.created_at).toDate(),
     },
     ...(!IsVendor
       ? [
           {
-            title: "GSD Name",
+            title: t("monitoring_gsd_name", "GSD Name"),
             dataIndex: "agent_name",
             key: "agent_name",
-            render: (text) => {
-              return text ? text : "GSD";
-            },
-            sorter: (a, b) => a?.agent_name?.localeCompare(b?.agent_name),
+            render: (text) =>
+              text || t("monitoring_gsd", "GSD"),
+            sorter: (a, b) =>
+              a?.agent_name?.localeCompare(b?.agent_name),
           },
         ]
       : []),
     {
-      title: "remark",
+      title: t("monitoring_remark", "Remark"),
       dataIndex: "remark",
       key: "remark",
     },
     {
-      title: "Monitoring Details View",
+      title: t(
+        "monitoring_details_view",
+        "Monitoring Details View"
+      ),
       key: "action",
       fixed: "right",
-      width: 130,
+      width: 150,
       render: (text, record) => (
         <div
           className="flex gap-2 text-blue-500 cursor-pointer"
-          onClick={() => {
+          onClick={() =>
             navigate(`/monitoring-report/${record?.id}`, {
               state: {
                 key: "monitoring-details",
                 record: formValue,
               },
-            });
-          }}
+            })
+          }
         >
-          Monitoring
+          {t("monitoring_view", "Monitoring")}
         </div>
       ),
     },
   ];
 
-  // pdf header
+  // PDF header
   const pdfHeader = [
-    "Sr No",
-    "Type Name",
-    "Code",
-    // "Unit",
-    "Sector",
-    "Vendor Name",
-    "Clean Status",
-    "Compliant Status",
-    // "Clean",
-    // "Maintenance",
-    // "Unclean",
-    // "Circle",
-    "Date",
-    "GSD Name",
+    t("monitoring_sr_no", "Sr No"),
+    t("monitoring_type_name", "Type Name"),
+    t("monitoring_code", "Code"),
+    t("monitoring_sector", "Sector"),
+    t("monitoring_vendor_name", "Vendor Name"),
+    t("monitoring_clean_status", "Clean Status"),
+    t("monitoring_compliant_status", "Compliant Status"),
+    t("monitoring_date", "Date"),
+    t("monitoring_gsd_name", "GSD Name"),
   ];
 
   const columnPercentages = [5, 16, 9, 9, 20, 7, 9, 10, 15];
 
-  // excel && pdf file
+  // PDF and Excel exports
   const exportToFile = async (isExcel) => {
     try {
       let url = URLS.monitoring.path + "?page=1&per_page=5000";
 
       if (userRoleId === "8") {
-        url = url + `&vendor_id=${UserId}`;
+        url += `&vendor_id=${UserId}`;
       }
+
       const res = await dispatch(
-        getPdfExcelData(`${url}${searchQuery ? searchQuery : ""}`)
+        getPdfExcelData(
+          `${url}${searchQuery ? searchQuery : ""}`
+        )
       );
 
       if (!res?.data?.listings) {
         throw new Error("No listings found in the response data.");
       }
 
-      // Calculate total units
-      const unitCount = res?.data?.listings?.reduce((total, item) => {
-        return total + Number(item?.unit_no) || 0;
-      }, 0);
-      // const CleanCount = res?.data?.listings?.reduce((total, item) => {
-      //   return total + Number(item?.one_count) || 0;
-      // }, 0);
-      // const UncleanCount = res?.data?.listings?.reduce((total, item) => {
-      //   return total + Number(item?.zero_count) || 0;
-      // }, 0);
-      // const MaintenanceCount = res?.data?.listings?.reduce((total, item) => {
-      //   return total + Number(item?.maintenance) || 0;
-      // }, 0);
+      const listings = res.data.listings;
 
-      // Map data for Excel
-      const myexcelData =
-        isExcel &&
-        res?.data?.listings?.map((data, index) => {
-          return {
-            Sr: index + 1,
-            "Asset Type Name": data?.asset_type_name,
-            Code: Number(data?.asset_code),
-            Unit: Number(data?.unit_no),
-            Sector: data?.sector_name,
-            "Vendor Name": data?.vendor_name,
-            "Clean Status": data?.issue?.some(
-              (que) => que?.question_en === checkQuestions
-            )
-              ? "Unclean"
-              : "Clean",
-            "Compliant Status": data?.zero_count
-              ? Number(data?.zero_count) === 0
-                ? "Compliant"
-                : Number(data?.zero_count) > 7
-                ? "Not Compliant"
-                : "Partial Compliant"
-              : "",
-            // Clean: Number(data?.one_count) || 0,
-            // Maintenance: Number(data?.maintenance) || 0,
-            // Unclean: Number(data?.zero_count) || 0,
-            // Circle: data?.circle_name,
-            Date: data?.created_at
-              ? moment(data?.created_at).format("DD-MMM-YYYY hh:mm A")
-              : "",
-            "GSD Name": data?.agent_name || "GSD",
-          };
-        });
+      const unitCount = listings.reduce(
+        (total, item) => total + (Number(item?.unit_no) || 0),
+        0
+      );
 
-      // Call the export function
-      isExcel &&
+      const getCleanStatus = (data) =>
+        data?.issue?.some(
+          (question) => question?.question_en === checkQuestions
+        )
+          ? t("monitoring_unclean", "Unclean")
+          : t("monitoring_clean", "Clean");
+
+      const getCompliantStatus = (value) => {
+        if (value === null || value === undefined || value === "") {
+          return "";
+        }
+
+        return Number(value) === 0
+          ? t("monitoring_compliant", "Compliant")
+          : Number(value) > 7
+          ? t("monitoring_not_compliant", "Not Compliant")
+          : t("monitoring_partial_compliant", "Partial Compliant");
+      };
+
+      const myexcelData = isExcel
+        ? listings.map((data, index) => ({
+            [t("monitoring_sr_no", "Sr")]: index + 1,
+            [t("monitoring_type_name", "Asset Type Name")]:
+              data?.asset_type_name,
+            [t("monitoring_code", "Code")]:
+              Number(data?.asset_code),
+            [t("monitoring_unit", "Unit")]:
+              Number(data?.unit_no),
+            [t("monitoring_sector", "Sector")]:
+              data?.sector_name,
+            [t("monitoring_vendor_name", "Vendor Name")]:
+              data?.vendor_name,
+            [t("monitoring_clean_status", "Clean Status")]:
+              getCleanStatus(data),
+            [t("monitoring_compliant_status", "Compliant Status")]:
+              getCompliantStatus(data?.zero_count),
+            [t("monitoring_date", "Date")]: data?.created_at
+              ? moment(data.created_at).format("DD-MMM-YYYY hh:mm A")
+              : "",
+            [t("monitoring_gsd_name", "GSD Name")]:
+              data?.agent_name || "GSD",
+          }))
+        : [];
+
+      if (isExcel) {
         exportToExcel(myexcelData, filesName, [
           {
-            name: "Total Unit",
+            name: t("monitoring_total_unit", "Total Unit"),
             value: unitCount,
             colIndex: 4,
           },
-          // {
-          //   name: "Total Clean",
-          //   value: CleanCount,
-          //   colIndex: 8,
-          // },
-          // {
-          //   name: "Total Maintenance",
-          //   value: MaintenanceCount,
-          //   colIndex: 9,
-          // },
-          // {
-          //   name: "Total Unclean",
-          //   value: UncleanCount,
-          //   colIndex: 10,
-          // },
         ]);
-
-      const pdfData =
-        !isExcel &&
-        res?.data?.listings?.map((data, index) => [
+      } else {
+        const pdfData = listings.map((data, index) => [
           index + 1,
           data?.asset_type_name,
           `${data?.asset_code}-${data?.unit_no}`,
-          // data?.unit_no,
           data?.sector_name,
           data?.vendor_name,
-          data?.issue?.some((que) => que?.question_en === checkQuestions)
-            ? "Unclean"
-            : "Clean",
-          data?.zero_count
-            ? Number(data?.zero_count) === 0
-              ? "Compliant"
-              : Number(data?.zero_count) > 7
-              ? "Not Compliant"
-              : "Partial Compliant"
-            : "",
-          // data?.one_count ? data?.one_count : "",
-          // data?.maintenance ? data?.maintenance : 0,
-          // data?.zero_count ? data?.zero_count : "",
-          // data?.circle_name,
+          getCleanStatus(data),
+          getCompliantStatus(data?.zero_count),
           data?.created_at
-            ? moment(data?.created_at).format("DD-MMM-YYYY hh:mm A")
+            ? moment(data.created_at).format("DD-MMM-YYYY hh:mm A")
             : "",
-          data?.agent_name ? data?.agent_name : "GSD",
+          data?.agent_name || "GSD",
         ]);
 
-      // Call the export function
-      !isExcel &&
         MonitoringPdfNew(
-          "Unit wise Monitoring Report",
+          t(
+            "monitoring_unit_wise_report",
+            "Unit wise Monitoring Report"
+          ),
           filesName,
           pdfHeader,
           [
             ...pdfData,
             [
               "",
-              "Total",
+              t("monitoring_total", "Total"),
               unitCount,
               "",
               "",
-              // CleanCount,
-              // MaintenanceCount,
-              // UncleanCount,
+              "",
+              "",
+              "",
+              "",
             ],
           ],
           true,
           true,
           columnPercentages,
-          pdfTitleData
+          {
+            category: t("monitoring_combined", pdfTitleData.category),
+            type: t("monitoring_combined", pdfTitleData.type),
+            date: pdfTitleData.date,
+          }
         );
+      }
     } catch (error) {
-      message.error(`Error occurred: ${error.message || "Unknown error"}`);
+      message.error(
+        `${t("monitoring_export_error", "Error occurred")}: ${
+          error.message || "Unknown error"
+        }`
+      );
     }
   };
 
   return (
-    <div className="">
-      <CommonDivider label={"Toilet & Tentage Monitoring"}></CommonDivider>
+    <div>
+      <CommonDivider
+        label={t(
+          "toilet_tentage_monitoring",
+          "Toilet & Tentage Monitoring"
+        )}
+      />
+
       <div className="flex justify-end gap-2 font-semibold">
-        <Button
-          type="primary"
-          onClick={() => {
-            exportToFile(false);
-          }}
-        >
-          Download Pdf
+        <Button type="primary" onClick={() => exportToFile(false)}>
+          {t("monitoring_download_pdf", "Download PDF")}
         </Button>
-        <Button
-          type="primary"
-          onClick={() => {
-            exportToFile(true);
-          }}
-        >
-          Download Excel
+
+        <Button type="primary" onClick={() => exportToFile(true)}>
+          {t("monitoring_download_excel", "Download Excel")}
         </Button>
       </div>
+
       <Collapse
         defaultActiveKey={["1"]}
         size="small"
         className="rounded-none mt-3"
         items={[
           {
-            key: 1,
+            key: "1",
             label: (
               <div className="flex items-center h-full">
-                <img src={search} className="h-5" alt="Search Icon" />
+                <img
+                  src={search}
+                  className="h-5"
+                  alt={t("search", "Search")}
+                />
               </div>
             ),
             children: (
@@ -699,42 +860,89 @@ const Monitoring = () => {
               >
                 <Row gutter={[16, 0]} align="middle">
                   {!IsVendor && (
-                    <Col key="asset_main_type_id" xs={24} sm={12} md={6} lg={5}>
+                    <Col
+                      key="asset_main_type_id"
+                      xs={24}
+                      sm={12}
+                      md={6}
+                      lg={5}
+                    >
                       <CustomSelect
-                        name={"asset_main_type_id"}
-                        label={"Select Category"}
-                        placeholder={"Select Category"}
+                        name="asset_main_type_id"
+                        label={t(
+                          "monitoring_select_category",
+                          "Select Category"
+                        )}
+                        placeholder={t(
+                          "monitoring_select_category",
+                          "Select Category"
+                        )}
                         onSelect={handleSelect}
                         options={AssetMainTypeDrop?.slice(0, 2) || []}
                       />
                     </Col>
                   )}
-                  <Col key="asset_type_id" xs={24} sm={12} md={6} lg={5}>
+
+                  <Col
+                    key="asset_type_id"
+                    xs={24}
+                    sm={12}
+                    md={6}
+                    lg={5}
+                  >
                     <CustomSelect
-                      name={"asset_type_id"}
-                      label={"Select Type"}
-                      placeholder={"Select Type"}
+                      name="asset_type_id"
+                      label={t("monitoring_select_type", "Select Type")}
+                      placeholder={t(
+                        "monitoring_select_type",
+                        "Select Type"
+                      )}
                       options={AssetTypeDrop || []}
                       onSelect={handleTypeSelect}
                     />
                   </Col>
+
                   {!IsVendor && (
                     <>
-                      <Col key="vendor_id" xs={24} sm={12} md={6} lg={5}>
+                      <Col
+                        key="vendor_id"
+                        xs={24}
+                        sm={12}
+                        md={6}
+                        lg={5}
+                      >
                         <CustomSelect
-                          name={"vendor_id"}
-                          label={"Select Vendor"}
-                          placeholder={"Select Vendor"}
+                          name="vendor_id"
+                          label={t(
+                            "monitoring_select_vendor",
+                            "Select Vendor"
+                          )}
+                          placeholder={t(
+                            "monitoring_select_vendor",
+                            "Select Vendor"
+                          )}
                           options={VendorCatTypeDrop || []}
                         />
                       </Col>
-                      <Col key="created_by" xs={24} sm={12} md={6} lg={5}>
+
+                      <Col
+                        key="created_by"
+                        xs={24}
+                        sm={12}
+                        md={6}
+                        lg={5}
+                      >
                         <CustomSelect
-                          name={"created_by"}
-                          label={"Select GSD"}
-                          placeholder={"Select GSD"}
+                          name="created_by"
+                          label={t(
+                            "monitoring_select_gsd",
+                            "Select GSD"
+                          )}
+                          placeholder={t(
+                            "monitoring_select_gsd",
+                            "Select GSD"
+                          )}
                           options={monitoringAgentDrop || []}
-                          // search dropdown
                           isOnSearchFind={true}
                           apiAction={getMonitoringAgent}
                           onSearchUrl={`${URLS?.monitoringAgent?.path}&keywords=`}
@@ -742,83 +950,150 @@ const Monitoring = () => {
                       </Col>
                     </>
                   )}
-                  <Col key="parking_type" xs={24} sm={12} md={6} lg={5}>
+
+                  <Col
+                    key="parking_type"
+                    xs={24}
+                    sm={12}
+                    md={6}
+                    lg={5}
+                  >
                     <CustomSelect
-                      name={"parking_type"}
-                      label={"Parking Type"}
-                      placeholder={"Parking Type"}
-                      options={parkingType || []}
+                      name="parking_type"
+                      label={t(
+                        "monitoring_parking_type",
+                        "Parking Type"
+                      )}
+                      placeholder={t(
+                        "monitoring_parking_type",
+                        "Parking Type"
+                      )}
+                      options={translatedParkingTypes}
                     />
                   </Col>
+
                   <Col key="code" xs={24} sm={12} md={6} lg={5}>
                     <CustomInput
-                      name={"code"}
-                      label={" Item QR Code"}
-                      placeholder={" Item QR Code"}
+                      name="code"
+                      label={t(
+                        "monitoring_item_qr_code",
+                        "Item QR Code"
+                      )}
+                      placeholder={t(
+                        "monitoring_item_qr_code",
+                        "Item QR Code"
+                      )}
                     />
                   </Col>
-                  <Col key="date_format" xs={24} sm={12} md={6} lg={5}>
+
+                  <Col
+                    key="date_format"
+                    xs={24}
+                    sm={12}
+                    md={6}
+                    lg={5}
+                  >
                     <CustomSelect
-                      name={"date_format"}
-                      label={"Select Date Type"}
-                      placeholder={"Select Date Type"}
+                      name="date_format"
+                      label={t(
+                        "monitoring_select_date_type",
+                        "Select Date Type"
+                      )}
+                      placeholder={t(
+                        "monitoring_select_date_type",
+                        "Select Date Type"
+                      )}
                       onSelect={handleDateSelect}
-                      options={dateOptions || []}
+                      options={translatedDateOptions}
                     />
                   </Col>
+
                   {showDateRange && (
                     <>
-                      <Col key="form_date" xs={24} sm={12} md={6} lg={5}>
+                      <Col
+                        key="form_date"
+                        xs={24}
+                        sm={12}
+                        md={6}
+                        lg={5}
+                      >
                         <CustomDatepicker
-                          name={"form_date"}
-                          label={"From Date"}
+                          name="form_date"
+                          label={t(
+                            "monitoring_from_date",
+                            "From Date"
+                          )}
                           className="w-full"
-                          placeholder={"From Date"}
+                          placeholder={t(
+                            "monitoring_from_date",
+                            "From Date"
+                          )}
                           rules={[
                             {
                               required: true,
-                              message: "Please select a start date!",
+                              message: t(
+                                "monitoring_start_date_required",
+                                "Please select a start date!"
+                              ),
                             },
                           ]}
                           onChange={(date) => {
-                            const dayjsObjectFrom = dayjs(date?.$d);
-                            const startDate = dayjsObjectFrom;
-
-                            const dayjsObjectTo = dayjs(
-                              form.getFieldValue("to_date")?.$d
+                            const selectedStart = dayjs(date);
+                            const selectedEnd = dayjs(
+                              form.getFieldValue("to_date")
                             );
-                            const endDate = dayjsObjectTo;
 
-                            // Condition 1: If startDate is after endDate, set end_time to null
-                            if (startDate.isAfter(endDate)) {
-                              form.setFieldValue("to_date", null);
+                            if (
+                              selectedStart.isValid() &&
+                              selectedEnd.isValid()
+                            ) {
+                              const difference = selectedEnd.diff(
+                                selectedStart,
+                                "days"
+                              );
+
+                              if (
+                                selectedStart.isAfter(selectedEnd) ||
+                                difference > 9
+                              ) {
+                                form.setFieldValue("to_date", null);
+                              }
                             }
 
-                            // Condition 2: If startDate is more than 7 days before endDate, set end_time to null
-                            const daysDifference = endDate.diff(
-                              startDate,
-                              "days"
+                            setStartDate(
+                              selectedStart.isValid()
+                                ? selectedStart.format("YYYY-MM-DD")
+                                : null
                             );
-                            if (daysDifference > 9) {
-                              form.setFieldValue("to_date", null);
-                            } else {
-                              // If the difference is within the allowed range, you can keep the value or process further if needed.
-                            }
-
-                            setStartDate(startDate.format("YYYY-MM-DD"));
                           }}
                         />
                       </Col>
-                      <Col key="to_date" xs={24} sm={12} md={6} lg={5}>
+
+                      <Col
+                        key="to_date"
+                        xs={24}
+                        sm={12}
+                        md={6}
+                        lg={5}
+                      >
                         <CustomDatepicker
-                          name={"to_date"}
-                          label={"To Date"}
+                          name="to_date"
+                          label={t(
+                            "monitoring_to_date",
+                            "To Date"
+                          )}
                           className="w-full"
-                          placeholder={"To Date"}
+                          placeholder={t(
+                            "monitoring_to_date",
+                            "To Date"
+                          )}
                           rules={[
                             {
                               required: true,
-                              message: "Please select a end date!",
+                              message: t(
+                                "monitoring_end_date_required",
+                                "Please select an end date!"
+                              ),
                             },
                           ]}
                           disabledDate={disabledDate}
@@ -826,78 +1101,54 @@ const Monitoring = () => {
                       </Col>
                     </>
                   )}
-                  {/* <Col key="clean_status" xs={24} sm={12} md={6} lg={5}>
-                    <CustomSelect
-                      name={"clean_status"}
-                      label={"Select Clean"}
-                      placeholder={"Select Clean"}
-                      options={cleanStatus || []}
-                    />
-                  </Col>{" "}
-                  <Col key="compliant_status" xs={24} sm={12} md={6} lg={5}>
-                    <CustomSelect
-                      name={"compliant_status"}
-                      label={"Select Compliant"}
-                      placeholder={"Select Compliant"}
-                      options={CompliantStatus || []}
-                    />
-                  </Col> */}
-                  <div className="flex justify-start my-4 space-x-2 ml-3">
-                    <Button
-                      loading={loading}
-                      type="button"
-                      htmlType="submit"
-                      className="w-fit rounded-none text-white bg-blue-500 hover:bg-blue-600"
-                    >
-                      Search
-                    </Button>
-                    <Button
-                      loading={loading}
-                      type="button"
-                      className="w-fit rounded-none text-white bg-orange-300 hover:bg-orange-600"
-                      onClick={resetForm}
-                    >
-                      Reset
-                    </Button>
-                  </div>
+
+                  <Col xs={24}>
+                    <div className="flex justify-start my-4 space-x-2 ml-3">
+                      <Button
+                        loading={loading}
+                        htmlType="submit"
+                        className="w-fit rounded-none text-white bg-blue-500 hover:bg-blue-600"
+                      >
+                        {t("search", "Search")}
+                      </Button>
+
+                      <Button
+                        loading={loading}
+                        className="w-fit rounded-none text-white bg-orange-300 hover:bg-orange-600"
+                        onClick={resetForm}
+                      >
+                        {t("reset", "Reset")}
+                      </Button>
+                    </div>
+                  </Col>
                 </Row>
               </Form>
             ),
           },
         ]}
       />
+
       {contextHolder}
 
-      {/* <CommonTable
-        columns={columns || []}
-        uri={"monitoring"}
-        details={details || []}
-        loading={loading}
-        // subtotalName={"Total Unit"}
-        // subtotalCount={details?.totalUnit}
-        tableSubheading={{
-          "Total Unit": `${details?.totalUnit || 0} per page`,
-        }}
-        scroll={{ x: 1400, y: 400 }}
-      ></CommonTable> */}
       <CustomTable
         loading={loading}
-        columns={columns || []}
+        columns={columns}
         bordered
         dataSource={details || []}
         scroll={{ x: 1400, y: 400 }}
         tableSubheading={{
-          "Total Records": getFormatedNumber(details?.totalRecords || 0) || 0,
-          "Total Unit": `${
+          [t("monitoring_total_records", "Total Records")]:
+            getFormatedNumber(details?.totalRecords || 0) || 0,
+
+          [t("monitoring_total_unit", "Total Unit")]: `${
             getFormatedNumber(details?.totalUnit || 0) || 0
-          } per page`,
+          } ${t("monitoring_per_page", "per page")}`,
         }}
         onPageChange={(page, size) => {
-          const obj = {
-            page: page,
-            size: size,
-          };
-          getUsers(obj);
+          getUsers({
+            page,
+            size,
+          });
         }}
       />
     </div>

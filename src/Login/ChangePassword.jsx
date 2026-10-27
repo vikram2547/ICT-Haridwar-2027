@@ -1,12 +1,27 @@
 import React, { useState } from "react";
 import { Button, Form, message } from "antd";
+import { useOutletContext } from "react-router-dom";
 import URLS from "../urils/URLS";
+import { DICT } from "../utils/dictionary";
 import CustomInput from "../commonComponents/CustomInput";
 
 const ChangePassword = () => {
   const [loading, setLoading] = useState(false);
-
   const [form] = Form.useForm();
+
+  // Read the selected language from the existing outlet context.
+  const outletContext = useOutletContext() || [];
+  const contextDict = outletContext[0] || {};
+  const lang = outletContext[1] || localStorage.getItem("lang") || "en";
+
+  // Use outlet translations first, then the existing DICT, then fallback.
+  const t = (key, fallback) =>
+    contextDict?.[key]?.[lang] ??
+    contextDict?.[key]?.en ??
+    DICT?.[key]?.[lang] ??
+    DICT?.[key]?.en ??
+    fallback ??
+    key;
 
   const headers = {
     "x-api-key": "YunHu873jHds83hRujGJKd873",
@@ -16,30 +31,43 @@ const ChangePassword = () => {
   };
 
   const handleChangePassword = async (data) => {
+    if (data?.confirmPassword !== data?.newPassword) {
+      message.error(
+        t("change_password_mismatch", "Passwords do not match.")
+      );
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      if (data?.confirmPassword !== data?.newPassword) {
-        message.error("Passwords do not match.");
-        return;
-      }
-      setLoading(true);
       const formData = new FormData();
       formData.append("password", data?.confirmPassword);
 
       const response = await fetch(`${URLS.baseUrl}/change-password`, {
         method: "POST",
-        headers: headers,
+        headers,
         body: formData,
       });
 
       const result = await response.json();
+
       if (result.success) {
-        message.success("Password changed successfully!");
+        message.success(
+          t("change_password_success", "Password changed successfully!")
+        );
         form.resetFields();
       } else {
-        message.error("Failed to change password.");
+        message.error(
+          result.message ||
+            t("change_password_failed", "Failed to change password.")
+        );
       }
     } catch (error) {
-      message.error("Error changing password.");
+      message.error(
+        t("change_password_error", "Error changing password.")
+      );
+      console.error("Change password error:", error);
     } finally {
       setLoading(false);
     }
@@ -47,7 +75,9 @@ const ChangePassword = () => {
 
   return (
     <div className="mt-3 mx-auto p-3 bg-white shadow-md rounded-lg w-full relative">
-      <div className="text-2xl font-bold mb-4">Change Password</div>
+      <div className="text-2xl font-bold mb-4">
+        {t("change_password_title", "Change Password")}
+      </div>
 
       <Form
         form={form}
@@ -55,66 +85,68 @@ const ChangePassword = () => {
         layout="vertical"
         autoComplete="off"
       >
-        <div className="grid grid-cols-2 gap-x-10 gap-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
           <CustomInput
             name="newPassword"
-            label={"New Password:"}
-            placeholder="Password"
+            label={t("change_password_new_label", "New Password:")}
+            placeholder={t("change_password_placeholder", "Password")}
             maxLength={15}
             autoComplete="off"
             isPassword={true}
             rules={[
               {
                 required: true,
-                message: "Please enter your password!",
+                message: t(
+                  "change_password_required",
+                  "Please enter your password!"
+                ),
               },
               {
                 min: 6,
-                message: "Password must be at least 6 characters.",
+                message: t(
+                  "change_password_min_length",
+                  "Password must be at least 6 characters."
+                ),
               },
             ]}
-            className={"mt-2"}
+            className="mt-2"
           />
+
           <CustomInput
             name="confirmPassword"
-            label={"Confirm Password:"}
-            placeholder="Password"
+            label={t(
+              "change_password_confirm_label",
+              "Confirm Password:"
+            )}
+            placeholder={t(
+              "change_password_confirm_placeholder",
+              "Confirm Password"
+            )}
             maxLength={15}
             autoComplete="off"
             isPassword={true}
             rules={[
               {
                 required: true,
-                message: "Please enter your password!",
+                message: t(
+                  "change_password_confirm_required",
+                  "Please confirm your password!"
+                ),
               },
               {
                 min: 6,
-                message: "Password must be at least 6 characters.",
+                message: t(
+                  "change_password_min_length",
+                  "Password must be at least 6 characters."
+                ),
               },
             ]}
-            className={"mt-2"}
+            className="mt-2"
           />
-          {/* <div>
-            <span className="font-semibold">New Password:</span>
-            <Input.Password
-              className="rounded-none"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Enter new password"
-            />
-          </div>
-
-          <div>
-            <span className="font-semibold">Confirm Password:</span>
-            <Input.Password
-              className="rounded-none"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
-            />
-          </div> */}
         </div>
-        <br></br>
+
+        <br />
+
         <div className="flex justify-end">
           <Form.Item>
             <Button
@@ -123,7 +155,7 @@ const ChangePassword = () => {
               loading={loading}
               className="w-fit rounded-none bg-5c"
             >
-              Save Changes
+              {t("change_password_save", "Save Changes")}
             </Button>
           </Form.Item>
         </div>

@@ -1,6 +1,11 @@
+
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate, useParams } from "react-router-dom";
+import {
+  useNavigate,
+  useParams,
+  useOutletContext,
+} from "react-router-dom";
 import { Button } from "antd";
 import { EditOutlined } from "@ant-design/icons";
 
@@ -9,12 +14,14 @@ import CommonDivider from "../../commonComponents/CommonDivider";
 import URLS from "../../urils/URLS";
 import RouteSelector from "./routeSelector";
 import { getRoutePickUpPoint } from "./routeSlice";
+import { DICT } from "../../utils/dictionary";
 
 const PickUpPoint = () => {
   const [details, setDetails] = useState({
     list: [],
     pageLength: 25,
     currentPage: 1,
+    totalRecords: 0,
   });
 
   const navigate = useNavigate();
@@ -22,100 +29,116 @@ const PickUpPoint = () => {
   const params = useParams();
   const { loading, PickUpPoint } = RouteSelector();
 
-  const getDatas = async () => {
-    const queryString = params?.page ? params?.page : params?.per_page;
-    const urlParam = new URLSearchParams(queryString);
-    const page = urlParam.get("page"); // "1"
-    const perPage = urlParam.get("per_page"); // "50"
+  const outletContext = useOutletContext() || [];
+  const contextDict = outletContext[0] || {};
+  const lang =
+    outletContext[1] || localStorage.getItem("lang") || "en";
+
+  const t = (key, fallback) =>
+    contextDict?.[key]?.[lang] ??
+    contextDict?.[key]?.en ??
+    DICT?.[key]?.[lang] ??
+    DICT?.[key]?.en ??
+    fallback ??
+    key;
+
+  const getDatas = () => {
+    const queryString = params?.page
+      ? params.page
+      : params?.per_page;
+
+    const urlParam = new URLSearchParams(queryString || "");
+    const page = urlParam.get("page");
+    const perPage = urlParam.get("per_page");
 
     const finalData = {
       page: page?.toString() || "1",
       per_page: perPage?.toString() || "10",
     };
 
-    let uri =
+    const uri =
       URLS?.getPickUpPoint?.path +
-      `?page=${finalData?.page}&per_page=${finalData?.per_page}`;
+      `?page=${finalData.page}&per_page=${finalData.per_page}`;
 
-    dispatch(getRoutePickUpPoint(uri)); // Fetch the data
+    dispatch(getRoutePickUpPoint(uri));
   };
 
   useEffect(() => {
     if (PickUpPoint) {
       const data = PickUpPoint?.data;
-      setDetails(() => {
-        return {
-          list: data?.pickuppoints,
-          pageLength: data?.paging[0].length,
-          currentPage: data?.paging[0].currentPage,
-          totalRecords: data?.paging[0].totalrecords,
-        };
+      const paging = data?.paging?.[0];
+
+      setDetails({
+        list: data?.pickuppoints || [],
+        pageLength: paging?.length || 25,
+        currentPage: paging?.currentPage || 1,
+        totalRecords: paging?.totalrecords || 0,
       });
     }
   }, [PickUpPoint]);
 
   useEffect(() => {
     getDatas();
-  }, [params]);
+  }, [params.page, params.per_page]);
 
   const columns = [
     {
-      title: "Sr. No",
+      title: t("pickup_point_sr_no", "Sr. No"),
       dataIndex: "sr",
       key: "sr",
       width: 80,
     },
     {
-      title: "Point Name",
+      title: t("pickup_point_name", "Point Name"),
       dataIndex: "point_name",
       key: "point_name",
     },
     {
-      title: "Latitude",
+      title: t("pickup_point_latitude", "Latitude"),
       dataIndex: "latitude",
       key: "latitude",
     },
     {
-      title: "Longitude",
+      title: t("pickup_point_longitude", "Longitude"),
       dataIndex: "longitude",
       key: "longitude",
     },
     {
-      title: "Action",
+      title: t("pickup_point_action", "Action"),
       dataIndex: "action",
       key: "action",
       fixed: "right",
       width: 80,
       render: (text, record) => (
-        <>
-          <div className="flex justify-between">
-            <Button
-              className="bg-blue-100 border-blue-500 focus:ring-blue-500 hover:bg-blue-200 rounded-full"
-              onClick={() => {
-                navigate(`/pickup-point-form`, {
-                  state: {
-                    key: "UpdateKey",
-                    record: record, // Pass the record as part of the state
-                  },
-                });
-              }}
-            >
-              <EditOutlined />
-            </Button>
-          </div>
-        </>
+        <div className="flex justify-between">
+          <Button
+            aria-label={t("pickup_point_edit", "Edit")}
+            title={t("pickup_point_edit", "Edit")}
+            className="bg-blue-100 border-blue-500 focus:ring-blue-500 hover:bg-blue-200 rounded-full"
+            onClick={() => {
+              navigate("/pickup-point-form", {
+                state: {
+                  key: "UpdateKey",
+                  record,
+                },
+              });
+            }}
+          >
+            <EditOutlined />
+          </Button>
+        </div>
       ),
     },
   ];
 
   return (
-    <div className="">
+    <div>
       <CommonDivider
-        label={"GPS -Pick Up Point"}
+        label={t("pickup_point_title", "GPS - Pick Up Point")}
         compo={
           <Button
             onClick={() => {
-              navigate(`/pickup-point-form`, {
+              navigate("/pickup-point-form", {
                 state: {
                   key: "AddKey",
                 },
@@ -123,18 +146,18 @@ const PickUpPoint = () => {
             }}
             className="mb-1 bg-green-400"
           >
-            Add Pickup Point
+            {t("pickup_point_add_button", "Add Pickup Point")}
           </Button>
         }
-      ></CommonDivider>
+      />
 
       <CommonTable
         loading={loading}
-        uri={"pickup-point"}
-        columns={columns || []}
-        details={details || []}
+        uri="pickup-point"
+        columns={columns}
+        details={details}
         scroll={{ x: 300, y: 400 }}
-      ></CommonTable>
+      />
     </div>
   );
 };

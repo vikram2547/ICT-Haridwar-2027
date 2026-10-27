@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
+import { useOutletContext } from "react-router-dom";
 import { Collapse, Form, Button, Row, Col, message } from "antd";
 import dayjs from "dayjs";
 import moment from "moment/moment";
@@ -18,13 +19,19 @@ import VendorSelectors from "../Reports/VendorwiseReports/vendorSelectors";
 import { getVendorCategoryTypeDrop } from "../Reports/VendorwiseReports/vendorslice";
 
 const MonitoringDailyReport = () => {
+  const outletContext = useOutletContext() || [];
+  const [dict, lang] = outletContext;
+
+  const t = (key, fallback) =>
+    dict?.[key]?.[lang] ?? dict?.[key]?.en ?? fallback ?? key;
+
   const [startDate, setStartDate] = useState(null);
   const [showDateRange, setShowDateRange] = useState(false);
   const [showDate, setShowDate] = useState(false);
-  const [filesName, setFilesName] = useState(null); // files Name
+  const [filesName, setFilesName] = useState(null);
 
-  const { DailyReport, loading } = MonitoringSelector(); // daily report
-  const { VendorCatTypeDrop } = VendorSelectors(); // vendor dropdown & Reports
+  const { DailyReport, loading } = MonitoringSelector();
+  const { VendorCatTypeDrop } = VendorSelectors();
 
   const userRoleId = localStorage.getItem("role_id");
   const userId = localStorage.getItem("userId");
@@ -32,19 +39,41 @@ const MonitoringDailyReport = () => {
   const dispatch = useDispatch();
   const [form] = Form.useForm();
 
-  // fiter finish
+  // Translate the date options without changing their values.
+  const translatedDateOptions = (dateDayOptions || []).map((option) => {
+    const optionValue = option.value ?? option.label;
+
+    const translatedLabel = {
+      Today: t("monitoring_report_today", "Today"),
+      "Date Range": t("monitoring_report_date_range", "Date Range"),
+      date: t("monitoring_report_date", "Date"),
+    }[optionValue];
+
+    return {
+      ...option,
+      label: translatedLabel ?? option.label,
+    };
+  });
+
+  // Submit report filters.
   const onFinishForm = async (values) => {
     const finalData = {
       vendor_id: userRoleId === "8" ? userId : values?.vendor_id,
     };
-    const name = getValueLabel(values?.vendor_id, VendorCatTypeDrop, "");
+
+    const name = getValueLabel(
+      values?.vendor_id,
+      VendorCatTypeDrop,
+      ""
+    );
+
     if (values?.form_date || values?.to_date) {
       const dayjsObjectFrom = dayjs(values?.form_date?.$d);
       const dayjsObjectTo = dayjs(values?.to_date?.$d);
 
-      // Format the date as 'YYYY-MM-DD'
       const start = dayjsObjectFrom.format("YYYY-MM-DD");
       const end = dayjsObjectTo.format("YYYY-MM-DD");
+
       finalData.form_date = values?.form_date ? start : end;
       finalData.to_date = values?.to_date ? end : start;
     } else if (values?.date_format === "Today") {
@@ -56,15 +85,17 @@ const MonitoringDailyReport = () => {
     }
 
     setFilesName(name);
+
     const url = URLS?.monitoringDailyReport?.path;
     dispatch(getMonitoringDailyReport(url, finalData));
   };
 
-  // reset form
+  // Reset form and report state.
   const resetForm = () => {
     form.resetFields();
     setShowDateRange(false);
     setShowDate(false);
+    setStartDate(null);
     setFilesName(null);
     setValue();
     dispatch(revertMonitoringSlice());
@@ -76,13 +107,17 @@ const MonitoringDailyReport = () => {
       setShowDate(false);
     } else if (value === "date") {
       setShowDate(true);
+      setShowDateRange(false);
       form.setFieldsValue({
         date: null,
+        form_date: null,
+        to_date: null,
       });
     } else {
       form.setFieldsValue({
         form_date: null,
         to_date: null,
+        date: null,
       });
       setShowDateRange(false);
       setShowDate(false);
@@ -90,10 +125,15 @@ const MonitoringDailyReport = () => {
   };
 
   const disabledDate = (current) => {
+    if (!current || !startDate) {
+      return false;
+    }
+
     const maxDate = moment(startDate).clone().add(8, "days");
+
     return (
-      current &&
-      (current.isBefore(startDate, "day") || current.isAfter(maxDate, "day"))
+      current.isBefore(startDate, "day") ||
+      current.isAfter(maxDate, "day")
     );
   };
 
@@ -105,48 +145,58 @@ const MonitoringDailyReport = () => {
     if (DailyReport?.success) {
       MonitoringDailyReportPdf(
         DailyReport?.data,
-        "Daily Monitoring Report",
+        t("monitoring_report_pdf_title", "Daily Monitoring Report"),
         filesName
-          ? `${filesName}- Daily Monitoring Report`
-          : "Daily Monitoring Report",
+          ? `${filesName} - ${t(
+              "monitoring_report_pdf_title",
+              "Daily Monitoring Report"
+            )}`
+          : t("monitoring_report_pdf_title", "Daily Monitoring Report"),
         false,
         false
       );
-      // const element = document.createElement("div");
-      // element.innerHTML = DailyReport;
-      // // element.innerHTML = DailyReport?.data?.html;
-      // // Use html2pdf to generate the PDF with custom styles
-      // html2pdf().from(element).save("Monitoring-Daily-Report.pdf");
+
       resetForm();
     } else if (DailyReport) {
-      message.error("Report Not Available");
+      message.error(
+        t("monitoring_report_not_available", "Report Not Available")
+      );
       resetForm();
     }
   }, [DailyReport]);
 
   useEffect(() => {
-    userRoleId !== "8" &&
+    if (userRoleId !== "8") {
       dispatch(
         getVendorCategoryTypeDrop({
           asset_main_type_id: 1,
         })
-      ); // vendor list
+      );
+    }
+
     setValue();
   }, []);
 
   return (
     <>
-      <CommonDivider label={"Daily Monitoring Report"}></CommonDivider>
+      <CommonDivider
+        label={t("monitoring_daily_report_title", "Daily Monitoring Report")}
+      />
+
       <Collapse
         defaultActiveKey={["1"]}
         size="small"
         className="rounded-none mt-3"
         items={[
           {
-            key: 1,
+            key: "1",
             label: (
               <div className="flex items-center h-full">
-                <img src={search} className="h-5" alt="Search Icon" />
+                <img
+                  src={search}
+                  className="h-5"
+                  alt={t("monitoring_report_search_icon", "Search Icon")}
+                />
               </div>
             ),
             children: (
@@ -158,89 +208,145 @@ const MonitoringDailyReport = () => {
               >
                 <Row gutter={[16, 16]} align="middle">
                   {userRoleId !== "8" && (
-                    <Col key="vendor_id" xs={24} sm={12} md={6} lg={5}>
+                    <Col
+                      key="vendor_id"
+                      xs={24}
+                      sm={12}
+                      md={6}
+                      lg={5}
+                    >
                       <CustomSelect
-                        name={"vendor_id"}
-                        label={"Select Vendor"}
-                        placeholder={"Select Vendor"}
+                        name="vendor_id"
+                        label={t("monitoring_report_select_vendor", "Select Vendor")}
+                        placeholder={t(
+                          "monitoring_report_select_vendor",
+                          "Select Vendor"
+                        )}
                         options={VendorCatTypeDrop || []}
                         rules={[
                           {
                             required: true,
-                            message: "Please select Vendor!",
+                            message: t(
+                              "monitoring_report_vendor_required",
+                              "Please select Vendor!"
+                            ),
                           },
                         ]}
                       />
                     </Col>
                   )}
-                  <Col key="date_format" xs={24} sm={12} md={6} lg={5}>
+
+                  <Col
+                    key="date_format"
+                    xs={24}
+                    sm={12}
+                    md={6}
+                    lg={5}
+                  >
                     <CustomSelect
-                      name={"date_format"}
-                      label={"Select Date Type"}
-                      placeholder={"Select Date Type"}
+                      name="date_format"
+                      label={t(
+                        "monitoring_report_select_date_type",
+                        "Select Date Type"
+                      )}
+                      placeholder={t(
+                        "monitoring_report_select_date_type",
+                        "Select Date Type"
+                      )}
                       onSelect={handleDateSelect}
-                      options={dateDayOptions || []}
+                      options={translatedDateOptions}
                       rules={[
                         {
                           required: true,
-                          message: "Please select Date Type!",
+                          message: t(
+                            "monitoring_report_date_type_required",
+                            "Please select Date Type!"
+                          ),
                         },
                       ]}
                     />
                   </Col>
+
                   {showDateRange && (
                     <>
-                      <Col key="form_date" xs={24} sm={12} md={6} lg={5}>
+                      <Col
+                        key="form_date"
+                        xs={24}
+                        sm={12}
+                        md={6}
+                        lg={5}
+                      >
                         <CustomDatepicker
-                          name={"form_date"}
-                          label={"From Date"}
+                          name="form_date"
+                          label={t("monitoring_report_from_date", "From Date")}
                           className="w-full"
-                          placeholder={"From Date"}
+                          placeholder={t(
+                            "monitoring_report_from_date",
+                            "From Date"
+                          )}
                           rules={[
                             {
                               required: true,
-                              message: "Please select a start date!",
+                              message: t(
+                                "monitoring_report_start_date_required",
+                                "Please select a start date!"
+                              ),
                             },
                           ]}
                           onChange={(date) => {
-                            const dayjsObjectFrom = dayjs(date?.$d);
-                            const startDate = dayjsObjectFrom;
-
-                            const dayjsObjectTo = dayjs(
+                            const startDateValue = dayjs(date?.$d);
+                            const endDateValue = dayjs(
                               form.getFieldValue("to_date")?.$d
                             );
-                            const endDate = dayjsObjectTo;
 
-                            // Condition 1: If startDate is after endDate, set end_time to null
-                            if (startDate.isAfter(endDate)) {
+                            if (
+                              endDateValue.isValid() &&
+                              startDateValue.isAfter(endDateValue)
+                            ) {
                               form.setFieldValue("to_date", null);
                             }
 
-                            // Condition 2: If startDate is more than 7 days before endDate, set end_time to null
-                            const daysDifference = endDate.diff(
-                              startDate,
+                            const daysDifference = endDateValue.diff(
+                              startDateValue,
                               "days"
                             );
-                            if (daysDifference > 7) {
+
+                            if (
+                              endDateValue.isValid() &&
+                              daysDifference > 7
+                            ) {
                               form.setFieldValue("to_date", null);
-                            } else {
-                              // If the difference is within the allowed range, you can keep the value or process further if needed.
                             }
 
-                            setStartDate(startDate.format("YYYY-MM-DD"));
+                            setStartDate(
+                              startDateValue.format("YYYY-MM-DD")
+                            );
                           }}
                         />
                       </Col>
-                      <Col key="to_date" xs={24} sm={12} md={6} lg={5}>
+
+                      <Col
+                        key="to_date"
+                        xs={24}
+                        sm={12}
+                        md={6}
+                        lg={5}
+                      >
                         <CustomDatepicker
-                          name={"to_date"}
-                          label={"To Date"}
+                          name="to_date"
+                          label={t("monitoring_report_to_date", "To Date")}
                           className="w-full"
-                          placeholder={"To Date"}
+                          placeholder={t(
+                            "monitoring_report_to_date",
+                            "To Date"
+                          )}
                           rules={[
                             {
                               required: true,
-                              message: "Please select a end date!",
+                              message: t(
+                                "monitoring_report_end_date_required",
+                                "Please select an end date!"
+                              ),
                             },
                           ]}
                           disabledDate={disabledDate}
@@ -248,44 +354,52 @@ const MonitoringDailyReport = () => {
                       </Col>
                     </>
                   )}
+
                   {showDate && (
-                    <Col key="date" xs={24} sm={12} md={6} lg={5}>
+                    <Col
+                      key="date"
+                      xs={24}
+                      sm={12}
+                      md={6}
+                      lg={5}
+                    >
                       <CustomDatepicker
-                        name={"date"}
-                        label={"Date"}
+                        name="date"
+                        label={t("monitoring_report_date", "Date")}
                         className="w-full"
-                        placeholder={"Date"}
+                        placeholder={t("monitoring_report_date", "Date")}
                         rules={[
                           {
                             required: true,
-                            message: "Please select a end date!",
+                            message: t(
+                              "monitoring_report_date_required",
+                              "Please select a date!"
+                            ),
                           },
                         ]}
                       />
                     </Col>
                   )}
-                  <div className="flex justify-start my-4 space-x-2 ml-3">
-                    <div>
+
+                  <Col xs={24}>
+                    <div className="flex justify-start my-4 space-x-2 ml-3">
                       <Button
                         loading={loading}
-                        type="button"
                         htmlType="submit"
                         className="w-fit rounded-none text-white bg-blue-500 hover:bg-blue-600"
                       >
-                        Search
+                        {t("search", "Search")}
                       </Button>
-                    </div>
-                    <div>
+
                       <Button
                         loading={loading}
-                        type="button"
                         className="w-fit rounded-none text-white bg-orange-300 hover:bg-orange-600"
                         onClick={resetForm}
                       >
-                        Reset
+                        {t("reset", "Reset")}
                       </Button>
                     </div>
-                  </div>
+                  </Col>
                 </Row>
               </Form>
             ),

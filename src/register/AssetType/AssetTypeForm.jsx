@@ -1,8 +1,10 @@
+
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate, useOutletContext } from "react-router";
 import { useDispatch } from "react-redux";
 import { Form, Button, Divider } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
+
 import { postData } from "../../Fetch/Axios";
 import URLS from "../../urils/URLS";
 import { getFormData } from "../../urils/getFormData";
@@ -12,6 +14,7 @@ import { getQuestionList } from "../questions/questionSlice";
 import QuestionSelector from "../questions/questionSelector";
 import CustomSelect from "../../commonComponents/CustomSelect";
 import CustomInput from "../../commonComponents/CustomInput";
+import { DICT } from "../../utils/dictionary";
 
 const AssetTypeForm = () => {
   const [loading, setLoading] = useState(false);
@@ -20,18 +23,34 @@ const AssetTypeForm = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const location = useLocation();
+
   const key = location.state?.key;
   const record = location.state?.record;
 
-  const { AssetMainTypeDrop, SLATypeDrop } = AssetTypeSelectors(); // asset main type
+  // Language context
+  const outletContext = useOutletContext() || [];
+  const contextDict = outletContext[0] || {};
+  const lang =
+    outletContext[1] || localStorage.getItem("lang") || "en";
+
+  const t = (key, fallback) =>
+    contextDict?.[key]?.[lang] ??
+    contextDict?.[key]?.en ??
+    DICT?.[key]?.[lang] ??
+    DICT?.[key]?.en ??
+    fallback ??
+    key;
+
+  const { AssetMainTypeDrop, SLATypeDrop } = AssetTypeSelectors();
   const { QuestionDrop } = QuestionSelector();
 
   const onFinish = async (values) => {
-    const stringQuestions = values?.questions
-      ? values?.questions?.map((data) => String(data)).join(", ")
+    const stringQuestions = values?.questions?.length
+      ? values.questions.map((data) => String(data)).join(", ")
       : "No questions available";
-    const stringSla = values?.slas
-      ? values?.slas?.map((data) => String(data)).join(", ")
+
+    const stringSla = values?.slas?.length
+      ? values.slas.map((data) => String(data)).join(", ")
       : "No slas available";
 
     const finalData = {
@@ -40,48 +59,58 @@ const AssetTypeForm = () => {
       questions: stringQuestions,
       slas: stringSla,
     };
+
     setLoading(true);
 
-    if (key === "UpdateKey") {
-      finalData.asset_type_id = record?.asset_type_id;
-    }
-
-    const res = await postData(
-      getFormData(finalData),
-      key === "UpdateKey" ? URLS.editAssetType.path : URLS.assetTypeEntry.path,
-      {
-        version: URLS.register.version,
+    try {
+      if (key === "UpdateKey") {
+        finalData.asset_type_id = record?.asset_type_id;
       }
-    );
 
-    if (res?.data?.success) {
-      form.resetFields();
-      navigate("/asset-type-list");
+      const res = await postData(
+        getFormData(finalData),
+        key === "UpdateKey"
+          ? URLS.editAssetType.path
+          : URLS.assetTypeEntry.path,
+        {
+          version: URLS.register.version,
+        }
+      );
+
+      if (res?.data?.success) {
+        form.resetFields();
+        navigate("/asset-type-list");
+      }
+    } catch (error) {
+      console.error("Failed to save asset type:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
-    // asset main type
     const assetMainTypeUrl = URLS?.assetMainTypePerPage?.path;
     dispatch(getAssetMainTypes(assetMainTypeUrl));
-    dispatch(getQuestionList()); // get question
-    // sla types
-    const sla_url = URLS?.slaTypes?.path;
-    dispatch(getSLATypes(sla_url));
-  }, []);
 
-  // set value
+    dispatch(getQuestionList());
+
+    const slaUrl = URLS?.slaTypes?.path;
+    dispatch(getSLATypes(slaUrl));
+  }, [dispatch]);
+
+  // Populate the form when editing an existing record
   useEffect(() => {
     if (record) {
-      const questionId = record?.questions?.map((data) => {
-        return data?.question_id;
-      });
+      const questionId = record?.questions?.map(
+        (data) => data?.question_id
+      );
 
-      let slasArray =
+      const slasArray =
         Number(record?.slas) === 0
           ? []
-          : record?.slas?.split(",").map((item) => item?.trim());
+          : record?.slas
+              ?.split(",")
+              .map((item) => item?.trim()) || [];
 
       form.setFieldsValue({
         asset_main_type_id: record?.asset_main_type_id,
@@ -92,8 +121,12 @@ const AssetTypeForm = () => {
         questions: questionId,
         slas: slasArray,
       });
+    } else {
+      form.resetFields();
     }
-  }, [record, key]);
+  }, [record, key, form]);
+
+  const isUpdate = key === "UpdateKey";
 
   return (
     <div className="mt-3">
@@ -101,96 +134,164 @@ const AssetTypeForm = () => {
         <div className="flex gap-2 items-center">
           <Button
             className="bg-gray-200 rounded-full w-9 h-9"
-            onClick={() => {
-              navigate("/asset-type-list");
-            }}
+            onClick={() => navigate("/asset-type-list")}
+            aria-label={t("asset_type_form_back", "Back")}
           >
-            <ArrowLeftOutlined></ArrowLeftOutlined>
+            <ArrowLeftOutlined />
           </Button>
-          <div className="text-d9 text-2xl  w-full flex items-end justify-between ">
+
+          <div className="text-d9 text-2xl w-full flex items-end justify-between">
             <div className="font-bold">
-              {key === "UpdateKey"
-                ? "Update Toilets & Tentage Type"
-                : "Add Toilets & Tentage Type"}
+              {isUpdate
+                ? t(
+                    "asset_type_form_update_title",
+                    "Update Toilets & Tentage Type"
+                  )
+                : t(
+                    "asset_type_form_add_title",
+                    "Add Toilets & Tentage Type"
+                  )}
             </div>
-            <div className="text-xs">All * marks fields are mandatory</div>
+
+            <div className="text-xs">
+              {t(
+                "asset_type_form_mandatory_note",
+                "All * marks fields are mandatory"
+              )}
+            </div>
           </div>
         </div>
-        <Divider className="bg-d9 h-2/3 mt-1"></Divider>
+
+        <Divider className="bg-d9 h-2/3 mt-1" />
+
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 mb-3">
             <CustomSelect
-              name={"asset_main_type_id"}
-              label={"Category"}
+              name="asset_main_type_id"
+              label={t("asset_type_form_category", "Category")}
               rules={[
                 {
                   required: true,
-                  message: "Please select category", // Customize the error message
+                  message: t(
+                    "asset_type_form_category_required",
+                    "Please select category"
+                  ),
                 },
               ]}
-              placeholder={"Select Category"}
+              placeholder={t(
+                "asset_type_form_select_category",
+                "Select Category"
+              )}
               options={AssetMainTypeDrop || []}
             />
+
             <CustomInput
               name="name"
               label={
-                <div className="font-semibold">Toilets & Tentage Type Name</div>
+                <div className="font-semibold">
+                  {t(
+                    "asset_type_form_type_name",
+                    "Toilets & Tentage Type Name"
+                  )}
+                </div>
               }
               rules={[
                 {
                   required: true,
-                  message: "Please enter an toilets & tentage type",
+                  message: t(
+                    "asset_type_form_type_name_required",
+                    "Please enter a toilets & tentage type"
+                  ),
                 },
               ]}
-              placeholder="Enter Toilets & Tentage Type Name"
+              placeholder={t(
+                "asset_type_form_enter_type_name",
+                "Enter Toilets & Tentage Type Name"
+              )}
             />
+
             <CustomInput
               name="name_hi"
-              label={<div className="font-semibold">Hindi</div>}
+              label={
+                <div className="font-semibold">
+                  {t("asset_type_form_hindi_name", "Hindi Name")}
+                </div>
+              }
               rules={[
                 {
                   required: true,
-                  message: "Please enter hindi text",
+                  message: t(
+                    "asset_type_form_hindi_required",
+                    "Please enter Hindi text"
+                  ),
                 },
               ]}
-              placeholder="Enter hindi text"
+              placeholder={t(
+                "asset_type_form_enter_hindi",
+                "Enter Hindi text"
+              )}
             />
+
             <CustomSelect
-              name={"slas"}
-              label={"Select SLAS Type"}
+              name="slas"
+              label={t("asset_type_form_sla_label", "Select SLA Type")}
               rules={[
                 {
                   required: true,
-                  message: "Please select slas type",
+                  message: t(
+                    "asset_type_form_sla_required",
+                    "Please select SLA type"
+                  ),
                 },
               ]}
-              placeholder="Select SLA Type"
+              placeholder={t(
+                "asset_type_form_sla_placeholder",
+                "Select SLA Type"
+              )}
               options={SLATypeDrop || []}
               mode="multiple"
             />
+
             <CustomSelect
-              name={"questions"}
-              label={"Select Questions"}
-              placeholder="Select Questions"
+              name="questions"
+              label={t(
+                "asset_type_form_questions_label",
+                "Select Questions"
+              )}
+              placeholder={t(
+                "asset_type_form_questions_placeholder",
+                "Select Questions"
+              )}
               options={QuestionDrop || []}
               mode="multiple"
             />
+
             <CustomInput
               type="textarea"
               name="description"
-              label={<div className="font-semibold">Description</div>}
-              placeholder="Toilets & Tentage Type Description"
+              label={
+                <div className="font-semibold">
+                  {t("asset_type_form_description", "Description")}
+                </div>
+              }
+              placeholder={t(
+                "asset_type_form_description_placeholder",
+                "Toilets & Tentage Type Description"
+              )}
             />
           </div>
+
           <div className="flex justify-end">
             <Form.Item>
               <Button
                 type="primary"
                 htmlType="submit"
                 className="w-fit rounded-none bg-5c"
-                loading={loading} // Show loading spinner during API call
+                loading={loading}
               >
-                {key === "UpdateKey" ? "Update" : "Add"}
+                {isUpdate
+                  ? t("asset_type_form_update_button", "Update")
+                  : t("asset_type_form_add_button", "Add")}
               </Button>
             </Form.Item>
           </div>

@@ -9,13 +9,13 @@ import { message } from "antd";
 // import img2 from "../assets/Images/MahaKumbhLogo_optimized.png";
 import calenderIcon from "../assets/Dashboard/calendarIcon.png";
 import logOutIcon from "../assets/Dashboard/logOutIcon.png";
-import { langingPage } from "../utils/dictionary";
 import { logOutUser } from "../Login/slice/loginSlice";
 import { revertAll } from "../Redux/action";
+import { DICT } from "../utils/dictionary";
 
 const NavHead = ({ lang, setLang }) => {
   const myDate = new Date();
-  const dict = langingPage;
+  const dict = DICT; 
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -72,7 +72,7 @@ const NavHead = ({ lang, setLang }) => {
           >
             {/* <img src={img2} className="h-20" alt="MahaKumbh 2025 Logo" /> */}
             <div className="text-white font-nutino text-sm xs:text-[8px] md:text-base lg:text-lg leading-tight">
-              <span>Kumbh Mela 2027, Haridwar Mela Authority.</span>
+              <span>{dict.title1[lang]}</span>
             </div>
 
             {/* <img src={img1} className="h-20" alt="UP Police Logo" /> */}

@@ -1,5 +1,7 @@
+
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
+import { useOutletContext } from "react-router";
 import dayjs from "dayjs";
 import moment from "moment";
 import { Collapse, Form, Button, message } from "antd";
@@ -26,305 +28,411 @@ import { ExportPdfFunction } from "../ExportPdfFunction";
 import { getSectorsList } from "../../vendor-section-allocation/vendor-sector/Slice/vendorSectorSlice";
 import VendorSectorSelectors from "../../vendor-section-allocation/vendor-sector/Slice/vendorSectorSelectors";
 
-const VehicleReports = ({ modalName = "Vehicle Report", showPdf = true }) => {
+const VehicleReports = ({
+  modalName = "Vehicle Report",
+  showPdf = true,
+}) => {
+  const [dict, lang] = useOutletContext();
+
+  // Translation helper: follows the existing project dictionary pattern.
+  const t = (key, fallback) =>
+    dict?.[key]?.[lang] ??
+    dict?.[key]?.en ??
+    fallback ??
+    key;
+
   const [details, setDetails] = useState({
     list: [],
     pageLength: 25,
     currentPage: 1,
+    totalRecords: 0,
   });
 
   const dispatch = useDispatch();
   const [form] = Form.useForm();
-  const formValue = form.getFieldsValue();
 
-  const { VehicleData, loading } = VehicleSelectors(); // vehicle
+  const { VehicleData, loading } = VehicleSelectors();
   const { paging, vehicles } = VehicleData?.data || {};
-  const { VendorCatTypeDrop } = VendorSelectors(); // vendor dropdown & Reports
-  const { SectorListDrop } = VendorSectorSelectors(); // all sector dropdown
 
-  // fiter finish
+  const { VendorCatTypeDrop } = VendorSelectors();
+  const { SectorListDrop } = VendorSectorSelectors();
+
+  // Read current form values when needed.
+  const getCurrentFormValues = () => form.getFieldsValue();
+
+  const getFormattedDate = (date) =>
+    date ? moment(new Date(date)).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD");
+
+  // Search filters
   const onFinishForm = (values) => {
-    const allUndefined = Object.values(values).every(
-      (value) => value === undefined
+    const hasSearchValue = Object.values(values).some(
+      (value) =>
+        value !== undefined &&
+        value !== null &&
+        value !== ""
     );
-    if (allUndefined) {
-      message.error("Please Select any search field");
+
+    if (!hasSearchValue) {
+      message.error(
+        t(
+          "vehicle_select_search_field",
+          "Please select or enter at least one search field"
+        )
+      );
       return;
     }
-    const dayjsDate = new Date(values?.date);
-    const formattedDate = moment(dayjsDate).format("YYYY-MM-DD");
+
     const finalValues = {
-      ...(values?.user_id && { user_id: `${values?.user_id}` }),
-      ...(values?.type && { type: `${values?.type}` }),
-      ...(values?.number && { number: `${values?.number}` }),
-      ...(values?.chassis_no && { chassis_no: `${values?.chassis_no}` }),
-      ...(values?.imei && { imei: `${values?.imei}` }),
-      ...(values?.sector_id && { sector_id: values?.sector_id }),
-      date: values?.date ? formattedDate : moment().format("YYYY-MM-DD"),
+      ...(values?.user_id && { user_id: `${values.user_id}` }),
+      ...(values?.type && { type: `${values.type}` }),
+      ...(values?.number && { number: `${values.number}` }),
+      ...(values?.chassis_no && {
+        chassis_no: `${values.chassis_no}`,
+      }),
+      ...(values?.imei && { imei: `${values.imei}` }),
+      ...(values?.sector_id && { sector_id: values.sector_id }),
+      date: getFormattedDate(values?.date),
       page: "1",
       per_page: "25",
     };
-    dispatch(getVehicleList(finalValues)); // get vehicle list
+
+    dispatch(getVehicleList(finalValues));
   };
 
-  // reset form
+  // Reset filters
   const resetForm = () => {
-    let newDate = dayjs().format("YYYY-MM-DD");
+    const newDate = dayjs().format("YYYY-MM-DD");
+
     form.resetFields();
     form.setFieldsValue({
       date: dayjs(newDate, "YYYY-MM-DD"),
     });
-    const myParam = {
-      page: "1",
-      per_page: "25",
-      date: moment().format("YYYY-MM-DD"),
-    };
-    dispatch(getVehicleList(myParam));
+
+    dispatch(
+      getVehicleList({
+        page: "1",
+        per_page: "25",
+        date: moment().format("YYYY-MM-DD"),
+      })
+    );
   };
 
-  const getUsers = async (dataObj = {}) => {
-    const dayjsDate = new Date(formValue?.date);
-    const formattedDate = moment(dayjsDate).format("YYYY-MM-DD");
+  // Pagination
+  const getUsers = (dataObj = {}) => {
+    const values = getCurrentFormValues();
+
     const newParam = {
-      page: dataObj?.page || "1",
-      per_page: dataObj?.size || "25",
-      ...form.getFieldsValue(),
-      date: formValue?.date ? formattedDate : moment().format("YYYY-MM-DD"),
+      page: String(dataObj?.page || "1"),
+      per_page: String(dataObj?.size || "25"),
+      ...(values?.user_id && { user_id: values.user_id }),
+      ...(values?.type && { type: values.type }),
+      ...(values?.number && { number: values.number }),
+      ...(values?.chassis_no && { chassis_no: values.chassis_no }),
+      ...(values?.imei && { imei: values.imei }),
+      ...(values?.sector_id && { sector_id: values.sector_id }),
+      date: getFormattedDate(values?.date),
     };
+
     dispatch(getVehicleList(newParam));
   };
 
+  // Update table data
   useEffect(() => {
     if (VehicleData?.success) {
-      setDetails(() => {
-        return {
-          list: vehicles || [],
-          pageLength: vehicles?.length || 1,
-          currentPage: paging[0].currentpage || 1,
-          totalRecords: paging[0].totalrecords || 1,
-        };
+      const currentPaging = paging?.[0] || {};
+
+      setDetails({
+        list: vehicles || [],
+        pageLength: vehicles?.length || 0,
+        currentPage: currentPaging?.currentpage || 1,
+        totalRecords: currentPaging?.totalrecords || 0,
       });
-    } else {
-      setDetails(() => {
-        return {
-          list: [],
-          pageLength: 0,
-          currentPage: 1,
-          totalRecords: 0,
-        };
+    } else if (VehicleData) {
+      setDetails({
+        list: [],
+        pageLength: 0,
+        currentPage: 1,
+        totalRecords: 0,
       });
     }
-  }, [VehicleData]);
+  }, [VehicleData, vehicles, paging]);
 
+  // Initial load and dropdown data
   useEffect(() => {
-    let newDate = dayjs().format("YYYY-MM-DD");
+    const newDate = dayjs().format("YYYY-MM-DD");
+
     form.setFieldsValue({
       date: dayjs(newDate, "YYYY-MM-DD"),
     });
-    getUsers();
-    const paramData = {
-      asset_main_type_id: 5,
-    };
-    dispatch(getVendorCategoryTypeDrop(paramData)); // asset type wise vendor list
-    dispatch(getSectorsList()); // all sectors
-  }, []);
 
-  const fileName = "Vehicle Report";
-  const vehicleTypefileName = formValue?.type;
-  const vendorfileName = getValueLabel(
-    formValue?.user_id,
+    dispatch(
+      getVehicleList({
+        page: "1",
+        per_page: "25",
+        date: moment().format("YYYY-MM-DD"),
+      })
+    );
+
+    dispatch(
+      getVendorCategoryTypeDrop({
+        asset_main_type_id: 5,
+      })
+    );
+
+    dispatch(getSectorsList());
+  }, [dispatch, form]);
+
+  // Export file names
+  const values = getCurrentFormValues();
+
+  const fileName = t("vehicle_report", "Vehicle Report");
+  const vehicleTypeFileName = values?.type;
+
+  const vendorFileName = getValueLabel(
+    values?.user_id,
     VendorCatTypeDrop,
     undefined
   );
-  const sector_idfileName = getValueLabel(
-    formValue?.sector_id,
+
+  const sectorFileName = getValueLabel(
+    values?.sector_id,
     SectorListDrop,
     undefined
   );
-  const fileDateName = dayjs(formValue?.date).format("DD-MMM-YYYY");
-  let finalFileName = fileName;
-  if (vehicleTypefileName || vendorfileName || fileDateName) {
-    const parts = [];
-    if (vendorfileName) parts.push(vendorfileName);
-    if (sector_idfileName) parts.push(sector_idfileName);
-    if (vehicleTypefileName) parts.push(vehicleTypefileName);
-    if (fileDateName) parts.push(fileDateName);
-    finalFileName += `-${parts.join(" - ")}`;
-  }
 
-  // vehicles reports
-  const vehicleColumns = [
-    {
-      title: "Vendor Name",
-      dataIndex: "user_name",
-      key: "user_name",
-    },
-    {
-      title: "Vehicle Type",
-      dataIndex: "type",
-      key: "type",
-    },
-    {
-      title: "Vehicle Number",
-      dataIndex: "number",
-      key: "number",
-    },
-    {
-      title: "IMEI Number",
-      dataIndex: "imei",
-      key: "imei",
-    },
-    {
-      title: "Chassis Number",
-      dataIndex: "chassis_no",
-      key: "chassis_no",
-    },
-    {
-      title: "Sector",
-      dataIndex: "sector_id",
-      key: "sector_id",
-      render: (text, record) => {
-        return text ? getValueLabel(text, SectorListDrop, "Sector") : "-";
-      },
-    },
-    {
-      title: "Routes",
-      dataIndex: "route_name",
-      key: "route_name",
-      render: (text, record) => {
-        return record?.route_name ? record : "-";
-      },
-    },
-    {
-      title: "Runnable (Kilometer)",
-      dataIndex: "distance_run",
-      key: "distance_run",
-      render: (text, record) => {
-        return record?.distance_run ? text : "0 Km";
-      },
-    },
-  ];
+  const fileDateName = values?.date
+    ? dayjs(values.date).format("DD-MMM-YYYY")
+    : dayjs().format("DD-MMM-YYYY");
 
-  // pdf header
-  const pdfHeader = useMemo(() => {
-    return [
-      "Sr No",
-      ...(formValue?.user_id ? [] : ["Vendor Name"]),
-      ...(formValue?.type ? [] : ["Vehicle Type"]),
-      "Vehicle Number",
-      "IMEI Number",
-      "Chassis Number",
-      ...(formValue?.sector_id ? [] : ["Sector Name"]),
-      "Routes",
-      "Kilometer",
-    ];
-  }, [formValue]);
+  const fileNameParts = [
+    vendorFileName,
+    sectorFileName,
+    vehicleTypeFileName,
+    fileDateName,
+  ].filter(Boolean);
 
+  const finalFileName = fileNameParts.length
+    ? `${fileName}-${fileNameParts.join(" - ")}`
+    : fileName;
+
+  // Vehicle table columns
+  const vehicleColumns = useMemo(
+    () => [
+      {
+        title: t("vehicle_vendor_name", "Vendor Name"),
+        dataIndex: "user_name",
+        key: "user_name",
+      },
+      {
+        title: t("vehicle_type", "Vehicle Type"),
+        dataIndex: "type",
+        key: "type",
+      },
+      {
+        title: t("vehicle_number", "Vehicle Number"),
+        dataIndex: "number",
+        key: "number",
+      },
+      {
+        title: t("vehicle_imei_number", "IMEI Number"),
+        dataIndex: "imei",
+        key: "imei",
+      },
+      {
+        title: t("vehicle_chassis_number", "Chassis Number"),
+        dataIndex: "chassis_no",
+        key: "chassis_no",
+      },
+      {
+        title: t("vehicle_sector", "Sector"),
+        dataIndex: "sector_id",
+        key: "sector_id",
+        render: (text) =>
+          text
+            ? getValueLabel(
+                text,
+                SectorListDrop,
+                t("vehicle_sector", "Sector")
+              )
+            : "-",
+      },
+      {
+        title: t("vehicle_routes", "Routes"),
+        dataIndex: "route_name",
+        key: "route_name",
+        render: (text) => text || "-",
+      },
+      {
+        title: t("vehicle_runnable_km", "Runnable (Kilometer)"),
+        dataIndex: "distance_run",
+        key: "distance_run",
+        render: (text) => (text ? `${text} Km` : "0 Km"),
+      },
+    ],
+    [lang, dict, SectorListDrop]
+  );
+
+  // PDF column headings
+  const pdfHeader = useMemo(
+    () => [
+      t("vehicle_sr_no", "Sr No"),
+      ...(values?.user_id
+        ? []
+        : [t("vehicle_vendor_name", "Vendor Name")]),
+      ...(values?.type
+        ? []
+        : [t("vehicle_type", "Vehicle Type")]),
+      t("vehicle_number", "Vehicle Number"),
+      t("vehicle_imei_number", "IMEI Number"),
+      t("vehicle_chassis_number", "Chassis Number"),
+      ...(values?.sector_id
+        ? []
+        : [t("vehicle_sector_name", "Sector Name")]),
+      t("vehicle_routes", "Routes"),
+      t("vehicle_kilometer", "Kilometer"),
+    ],
+    [values, lang, dict]
+  );
+
+  // Download PDF / Excel
   const exportToFile = async (isExcel) => {
-    const dayjsDate = new Date(formValue?.date);
-    const formattedDate = moment(dayjsDate).format("YYYY-MM-DD");
+    const currentValues = getCurrentFormValues();
+
     const param = {
       page: "1",
       per_page: "5000",
-      ...(formValue?.user_id && { user_id: formValue?.user_id }),
-      ...(formValue?.type && { type: formValue?.type }),
-      ...(formValue?.number && { number: formValue?.number }),
-      ...(formValue?.imei && { imei: formValue?.imei }),
-      ...(formValue?.sector_id && { sector_id: formValue?.sector_id }),
-      ...(formValue?.chassis_no && { chassis_no: formValue?.chassis_no }),
-      date: formValue?.date ? formattedDate : moment().format("YYYY-MM-DD"),
+      ...(currentValues?.user_id && {
+        user_id: currentValues.user_id,
+      }),
+      ...(currentValues?.type && {
+        type: currentValues.type,
+      }),
+      ...(currentValues?.number && {
+        number: currentValues.number,
+      }),
+      ...(currentValues?.imei && {
+        imei: currentValues.imei,
+      }),
+      ...(currentValues?.sector_id && {
+        sector_id: currentValues.sector_id,
+      }),
+      ...(currentValues?.chassis_no && {
+        chassis_no: currentValues.chassis_no,
+      }),
+      date: getFormattedDate(currentValues?.date),
     };
+
     try {
       const url = URLS?.vehicles?.path;
-      const res = await dispatch(getPdfExcelData(`${url}`, param));
+      const res = await dispatch(getPdfExcelData(url, param));
+
       if (!res?.data?.vehicles) {
         throw new Error("No vehicles found in the response data.");
       }
 
-      // Map data for Excel
-      const myexcelData =
-        isExcel &&
-        res?.data?.vehicles?.map((data, index) => {
-          return {
-            Sr: index + 1,
-            ...(!formValue?.user_id && {
-              "Vendor Name": data?.user_name || "",
+      const excelData = isExcel
+        ? res.data.vehicles.map((data, index) => ({
+            [t("vehicle_sr_no", "Sr No")]: index + 1,
+            ...(!currentValues?.user_id && {
+              [t("vehicle_vendor_name", "Vendor Name")]:
+                data?.user_name || "",
             }),
-            ...(!formValue?.type && {
-              "Vehicle Type": data?.type || "",
+            ...(!currentValues?.type && {
+              [t("vehicle_type", "Vehicle Type")]: data?.type || "",
             }),
-            "Vehicle Number": data?.number || "",
-            "IMEI Number": Number(data?.imei) || "",
-            "Chassis Number": data?.chassis_no || "",
-            ...(!formValue?.sector_id && {
-              "Sector Name":
-                getValueLabel(data?.sector_id, SectorListDrop, "Sector") || "",
+            [t("vehicle_number", "Vehicle Number")]:
+              data?.number || "",
+            [t("vehicle_imei_number", "IMEI Number")]:
+              data?.imei || "",
+            [t("vehicle_chassis_number", "Chassis Number")]:
+              data?.chassis_no || "",
+            ...(!currentValues?.sector_id && {
+              [t("vehicle_sector_name", "Sector Name")]:
+                getValueLabel(
+                  data?.sector_id,
+                  SectorListDrop,
+                  t("vehicle_sector", "Sector")
+                ) || "",
             }),
-            Routes: data?.route_name || "-",
-            Kilometers: data?.distance_run || "0 Km",
-          };
-        });
+            [t("vehicle_routes", "Routes")]:
+              data?.route_name || "-",
+            [t("vehicle_kilometer", "Kilometer")]:
+              data?.distance_run || "0 Km",
+          }))
+        : [];
 
-      const pdfData =
-        !isExcel &&
-        res?.data?.vehicles?.map((data, index) => [
-          index + 1,
-          ...(formValue?.user_id ? [] : [data?.user_name || ""]),
-          ...(formValue?.type ? [] : [data?.type || ""]),
-          data?.number || "",
-          Number(data?.imei) || "",
-          data?.chassis_no || "",
-          ...(formValue?.sector_id
-            ? []
-            : [getValueLabel(data?.sector_id, SectorListDrop, "Sector") || ""]),
-          data?.route_name || "-",
-          data?.distance_run || "0 Km",
-        ]);
+      const pdfData = !isExcel
+        ? res.data.vehicles.map((data, index) => [
+            index + 1,
+            ...(!currentValues?.user_id
+              ? [data?.user_name || ""]
+              : []),
+            ...(!currentValues?.type ? [data?.type || ""] : []),
+            data?.number || "",
+            data?.imei || "",
+            data?.chassis_no || "",
+            ...(!currentValues?.sector_id
+              ? [
+                  getValueLabel(
+                    data?.sector_id,
+                    SectorListDrop,
+                    t("vehicle_sector", "Sector")
+                  ) || "",
+                ]
+              : []),
+            data?.route_name || "-",
+            data?.distance_run || "0 Km",
+          ])
+        : [];
 
-      // Call the export function
-      isExcel && exportToExcel(myexcelData, `${finalFileName}`);
-
-      // Call the export function
-      !isExcel &&
+      if (isExcel) {
+        exportToExcel(excelData, finalFileName);
+      } else {
         ExportPdfFunction(
-          `${finalFileName}`,
-          `${finalFileName}`,
+          finalFileName,
+          finalFileName,
           pdfHeader,
           pdfData,
           true,
           false
-          // columnPercentages
         );
+      }
     } catch (error) {
-      message.error(`Error occurred: ${error.message || "Unknown error"}`);
+      message.error(
+        `${t("vehicle_export_error", "Export error")}: ${
+          error?.message || "Unknown error"
+        }`
+      );
     }
   };
 
   return (
     <>
-      <CommonDivider className="ml-10-" label={`${modalName}`} />
+      <CommonDivider
+        className="ml-10-"
+        label={t("vehicle_report", modalName)}
+      />
+
       <div className="flex justify-end gap-2 font-semibold">
         {showPdf && (
           <>
             <Button
               type="primary"
-              onClick={() => {
-                exportToFile(false);
-              }}
+              onClick={() => exportToFile(false)}
             >
-              Download Pdf
+              {t("download_pdf", "Download PDF")}
             </Button>
+
             <Button
               type="primary"
-              onClick={() => {
-                exportToFile(true);
-              }}
+              onClick={() => exportToFile(true)}
             >
-              Download Excel
+              {t("download_excel", "Download Excel")}
             </Button>
           </>
         )}
       </div>
+
       <div className="rounded-md w-full">
         <div className="mx-4 mb-6">
           <Collapse
@@ -333,10 +441,14 @@ const VehicleReports = ({ modalName = "Vehicle Report", showPdf = true }) => {
             className="rounded-none mt-3"
             items={[
               {
-                key: 1,
+                key: "1",
                 label: (
                   <div className="flex items-center h-full">
-                    <img src={search} className="h-5" alt="Search Icon" />
+                    <img
+                      src={search}
+                      className="h-5"
+                      alt={t("search", "Search")}
+                    />
                   </div>
                 ),
                 children: (
@@ -348,66 +460,80 @@ const VehicleReports = ({ modalName = "Vehicle Report", showPdf = true }) => {
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4">
                       <CustomSelect
-                        name={"user_id"}
-                        label={"Select Vendor"}
-                        placeholder={"Select Vendor"}
+                        name="user_id"
+                        label={t("select_vendor", "Select Vendor")}
+                        placeholder={t("select_vendor", "Select Vendor")}
                         options={VendorCatTypeDrop || []}
                       />
+
                       <CustomSelect
-                        label="Vehicle Type"
+                        label={t("vehicle_type", "Vehicle Type")}
                         name="type"
-                        placeholder={"Select Vehicle Type"}
+                        placeholder={t(
+                          "vehicle_select_type",
+                          "Select Vehicle Type"
+                        )}
                         options={vehicleType || []}
                       />
+
                       <CustomInput
-                        label="Vehicle Number"
+                        label={t("vehicle_number", "Vehicle Number")}
                         name="number"
-                        placeholder="eg. AA00AA0000"
+                        placeholder={t(
+                          "vehicle_number_placeholder",
+                          "e.g. AA00AA0000"
+                        )}
                         maxLength={10}
                       />
+
                       <CustomInput
-                        label="IMEI Number"
+                        label={t("vehicle_imei_number", "IMEI Number")}
                         name="imei"
-                        placeholder="Enter IMEI Number"
+                        placeholder={t(
+                          "vehicle_enter_imei",
+                          "Enter IMEI Number"
+                        )}
                       />
+
                       <CustomInput
-                        label="Chassis Number"
+                        label={t("vehicle_chassis_number", "Chassis Number")}
                         name="chassis_no"
-                        placeholder="Enter Chassis Number"
+                        placeholder={t(
+                          "vehicle_enter_chassis",
+                          "Enter Chassis Number"
+                        )}
                       />
+
                       <CustomSelect
-                        name={"sector_id"}
-                        label={"Select Sector"}
-                        placeholder={"Select Sector"}
+                        name="sector_id"
+                        label={t("select_sector", "Select Sector")}
+                        placeholder={t("select_sector", "Select Sector")}
                         options={SectorListDrop || []}
                       />
+
                       <CustomDatepicker
-                        name={"date"}
-                        label={"Date"}
+                        name="date"
+                        label={t("date", "Date")}
                         className="w-full"
-                        placeholder={"Date"}
+                        placeholder={t("date", "Date")}
                       />
+
                       <div className="flex justify-start my-4 space-x-2 ml-3">
-                        <div>
-                          <Button
-                            loading={loading}
-                            type="button"
-                            htmlType="submit"
-                            className="w-fit rounded-none text-white bg-blue-500 hover:bg-blue-600"
-                          >
-                            Search
-                          </Button>
-                        </div>
-                        <div>
-                          <Button
-                            loading={loading}
-                            type="button"
-                            className="w-fit rounded-none text-white bg-orange-300 hover:bg-orange-600"
-                            onClick={resetForm}
-                          >
-                            Reset
-                          </Button>
-                        </div>
+                        <Button
+                          loading={loading}
+                          htmlType="submit"
+                          className="w-fit rounded-none text-white bg-blue-500 hover:bg-blue-600"
+                        >
+                          {t("search", "Search")}
+                        </Button>
+
+                        <Button
+                          loading={loading}
+                          className="w-fit rounded-none text-white bg-orange-300 hover:bg-orange-600"
+                          onClick={resetForm}
+                        >
+                          {t("reset", "Reset")}
+                        </Button>
                       </div>
                     </div>
                   </Form>
@@ -415,21 +541,19 @@ const VehicleReports = ({ modalName = "Vehicle Report", showPdf = true }) => {
               },
             ]}
           />
+
           <CustomTable
             loading={loading}
-            columns={vehicleColumns || []}
+            columns={vehicleColumns}
             bordered
-            dataSource={details || []}
+            dataSource={details}
             scroll={{ x: 100, y: 400 }}
             tableSubheading={{
-              "Total Records": getFormatedNumber(details?.totalRecords) || 0,
+              [t("vehicle_total_records", "Total Records")]:
+                getFormatedNumber(details?.totalRecords) || 0,
             }}
             onPageChange={(page, size) => {
-              const obj = {
-                page: page,
-                size: size,
-              };
-              getUsers(obj);
+              getUsers({ page, size });
             }}
           />
         </div>

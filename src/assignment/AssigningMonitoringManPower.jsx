@@ -1,29 +1,56 @@
+
 import React, { useState } from "react";
-import { Form, Select, Input, Button, Divider } from "antd";
+import { useOutletContext } from "react-router";
+import { Form, Select, Input, Button, Divider, message } from "antd";
 
 const { Option } = Select;
 const { TextArea } = Input;
 
 const AssigningMonitoringManPower = () => {
+  const [dict, lang] = useOutletContext();
+
+  const t = (key, fallback) =>
+    dict?.[key]?.[lang] ?? dict?.[key]?.en ?? fallback ?? key;
+
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
   const onFinish = (values) => {
-    // Save assignment data to local storage
-    const localAssignments =
-      JSON.parse(localStorage.getItem("assignments")) || [];
-    localAssignments.push(JSON.parse(JSON.stringify(values)));
-    localStorage.setItem("assignments", JSON.stringify(localAssignments));
+    try {
+      const localAssignments =
+        JSON.parse(localStorage.getItem("assignments")) || [];
+
+      localAssignments.push(JSON.parse(JSON.stringify(values)));
+
+      localStorage.setItem(
+        "assignments",
+        JSON.stringify(localAssignments)
+      );
+
+      message.success(
+        t(
+          "manpower_assignment_success",
+          "Assignment saved successfully"
+        )
+      );
+
+      form.resetFields();
+    } catch (error) {
+      message.error(
+        t(
+          "manpower_assignment_error",
+          "Unable to save assignment. Please try again."
+        )
+      );
+    }
   };
 
-  // Example list of users
   const users = [
     { id: 1, name: "Alice" },
     { id: 2, name: "Bob" },
     { id: 3, name: "Charlie" },
   ];
 
-  // Example list of assets
   const assets = [
     { id: 1, name: "Asset 1" },
     { id: 2, name: "Asset 2" },
@@ -33,33 +60,62 @@ const AssigningMonitoringManPower = () => {
   return (
     <div className="mx-auto p-6 bg-white shadow-md rounded-lg mt-3 w-full">
       <div className="text-d9 text-2xl flex items-end justify-between">
-        <div className="font-bold">Assignment Form</div>
-        <div className="text-xs">All * marked fields are mandatory</div>
+        <div className="font-bold">
+          {t("manpower_assignment_form", "Assignment Form")}
+        </div>
+
+        <div className="text-xs">
+          {t(
+            "mandatory_fields_note",
+            "All * marked fields are mandatory"
+          )}
+        </div>
       </div>
-      <Divider className="bg-d9 h-2/3 mt-1"></Divider>
+
+      <Divider className="bg-d9 h-2/3 mt-1" />
+
       {loading ? (
         <div className="flex justify-center items-center h-full w-full">
-          Loading...
+          {t("loading", "Loading...")}
         </div>
       ) : (
         <Form
           form={form}
           layout="vertical"
           onFinish={onFinish}
-          initialValues={{ role: "option1", department: "sanitation" }}
+          initialValues={{
+            role: "admin",
+            department: "sanitation",
+          }}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-5">
+            {/* User Name */}
             <Form.Item
-              label={<div className="font-semibold">User Name</div>}
+              label={
+                <div className="font-semibold">
+                  {t("manpower_user_name", "User Name")}
+                </div>
+              }
               name="userName"
-              rules={[{ required: true, message: "Please select a user" }]}
+              rules={[
+                {
+                  required: true,
+                  message: t(
+                    "manpower_select_user_required",
+                    "Please select a user"
+                  ),
+                },
+              ]}
               className="mb-4"
             >
               <Select
-                placeholder="Select User"
+                placeholder={t("manpower_select_user", "Select User")}
                 showSearch
+                optionFilterProp="children"
                 filterOption={(input, option) =>
-                  option.children.toLowerCase().includes(input.toLowerCase())
+                  String(option?.children ?? "")
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
                 }
                 className="rounded-none"
               >
@@ -71,66 +127,158 @@ const AssigningMonitoringManPower = () => {
               </Select>
             </Form.Item>
 
+            {/* Role */}
             <Form.Item
-              label={<div className="font-semibold">Role</div>}
+              label={
+                <div className="font-semibold">
+                  {t("manpower_role", "Role")}
+                </div>
+              }
               name="role"
-              rules={[{ required: true, message: "Please select a role" }]}
-              className="mb-4"
-            >
-              <Select placeholder="Select Role" className="rounded-none">
-                <Option value="option1">Admin</Option>
-                <Option value="option1">Monitoring Agent</Option>
-                <Option value="option1">Driver</Option>
-                <Option value="option1">Supervisor</Option>
-                <Option value="option1">Vendor</Option>
-                <Option value="option2">MIS Officer</Option>
-              </Select>
-            </Form.Item>
-
-            <Form.Item
-              label={<div className="font-semibold">Department</div>}
-              name="department"
               rules={[
-                { required: true, message: "Please select a department" },
-              ]}
-              className="mb-4"
-            >
-              <Select placeholder="Select Department" className="rounded-none">
-                <Option value="sanitation">Sanitation</Option>
-                <Option value="tentage">Tentage</Option>
-                <Option value="mis">MIS</Option>
-                <Option value="admin">Admin</Option>
-              </Select>
-            </Form.Item>
-
-            <Form.Item
-              label={<div className="font-semibold">Sub Department</div>}
-              name="subDepartment"
-              rules={[
-                { required: true, message: "Please select a sub department" },
+                {
+                  required: true,
+                  message: t(
+                    "manpower_select_role_required",
+                    "Please select a role"
+                  ),
+                },
               ]}
               className="mb-4"
             >
               <Select
-                placeholder="Select Sub Department"
+                placeholder={t("manpower_select_role", "Select Role")}
                 className="rounded-none"
               >
-                <Option value="manpowerDeployment">Manpower Deployment</Option>
-                <Option value="equipmentManagement">
-                  Equipment Management
+                <Option value="admin">
+                  {t("manpower_admin", "Admin")}
+                </Option>
+                <Option value="monitoringAgent">
+                  {t("manpower_monitoring_agent", "Monitoring Agent")}
+                </Option>
+                <Option value="driver">
+                  {t("manpower_driver", "Driver")}
+                </Option>
+                <Option value="supervisor">
+                  {t("manpower_supervisor", "Supervisor")}
+                </Option>
+                <Option value="vendor">
+                  {t("manpower_vendor", "Vendor")}
+                </Option>
+                <Option value="misOfficer">
+                  {t("manpower_mis_officer", "MIS Officer")}
                 </Option>
               </Select>
             </Form.Item>
 
+            {/* Department */}
             <Form.Item
-              label={<div className="font-semibold">Asset Name</div>}
-              name="assetName"
+              label={
+                <div className="font-semibold">
+                  {t("manpower_department", "Department")}
+                </div>
+              }
+              name="department"
               rules={[
-                { required: true, message: "Please select an asset name" },
+                {
+                  required: true,
+                  message: t(
+                    "manpower_select_department_required",
+                    "Please select a department"
+                  ),
+                },
               ]}
               className="mb-4"
             >
-              <Select placeholder="Select Asset Name" className="rounded-none">
+              <Select
+                placeholder={t(
+                  "manpower_select_department",
+                  "Select Department"
+                )}
+                className="rounded-none"
+              >
+                <Option value="sanitation">
+                  {t("manpower_sanitation", "Sanitation")}
+                </Option>
+                <Option value="tentage">
+                  {t("manpower_tentage", "Tentage")}
+                </Option>
+                <Option value="mis">
+                  {t("manpower_mis", "MIS")}
+                </Option>
+                <Option value="admin">
+                  {t("manpower_admin", "Admin")}
+                </Option>
+              </Select>
+            </Form.Item>
+
+            {/* Sub Department */}
+            <Form.Item
+              label={
+                <div className="font-semibold">
+                  {t("manpower_sub_department", "Sub Department")}
+                </div>
+              }
+              name="subDepartment"
+              rules={[
+                {
+                  required: true,
+                  message: t(
+                    "manpower_select_sub_department_required",
+                    "Please select a sub department"
+                  ),
+                },
+              ]}
+              className="mb-4"
+            >
+              <Select
+                placeholder={t(
+                  "manpower_select_sub_department",
+                  "Select Sub Department"
+                )}
+                className="rounded-none"
+              >
+                <Option value="manpowerDeployment">
+                  {t(
+                    "manpower_deployment",
+                    "Manpower Deployment"
+                  )}
+                </Option>
+                <Option value="equipmentManagement">
+                  {t(
+                    "manpower_equipment_management",
+                    "Equipment Management"
+                  )}
+                </Option>
+              </Select>
+            </Form.Item>
+
+            {/* Asset Name */}
+            <Form.Item
+              label={
+                <div className="font-semibold">
+                  {t("manpower_asset_name", "Asset Name")}
+                </div>
+              }
+              name="assetName"
+              rules={[
+                {
+                  required: true,
+                  message: t(
+                    "manpower_select_asset_required",
+                    "Please select an asset name"
+                  ),
+                },
+              ]}
+              className="mb-4"
+            >
+              <Select
+                placeholder={t(
+                  "manpower_select_asset",
+                  "Select Asset Name"
+                )}
+                className="rounded-none"
+              >
                 {assets.map((asset) => (
                   <Option key={asset.id} value={asset.name}>
                     {asset.name}
@@ -139,12 +287,26 @@ const AssigningMonitoringManPower = () => {
               </Select>
             </Form.Item>
 
+            {/* Assignment Details */}
             <Form.Item
-              label={<div className="font-semibold">Assignment Details</div>}
+              label={
+                <div className="font-semibold">
+                  {t(
+                    "manpower_assignment_details",
+                    "Assignment Details"
+                  )}
+                </div>
+              }
               name="assignmentDetails"
               className="mb-4"
             >
-              <TextArea rows={3} placeholder="Enter Assignment Details" />
+              <TextArea
+                rows={3}
+                placeholder={t(
+                  "manpower_enter_assignment_details",
+                  "Enter Assignment Details"
+                )}
+              />
             </Form.Item>
           </div>
 
@@ -155,7 +317,7 @@ const AssigningMonitoringManPower = () => {
                 htmlType="submit"
                 className="w-fit rounded-none bg-5c"
               >
-                Submit
+                {t("submit", "Submit")}
               </Button>
             </Form.Item>
           </div>
